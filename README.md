@@ -56,6 +56,10 @@ L-BFGS-B (sklearn's GPR optimiser) converges to a dead-kernel local maximum (ℓ
 - **Single-T 25°C**: joint normalisation over train+test to remove cell-to-cell impedance offset (~0.04 Ω)
 - **Capacity/RUL outputs**: `normalize_y=True` (sklearn) for capacity; `normalize_y=False` for RUL
 
+### ARD optimisation caveat
+
+The paper used MATLAB's GPML `minimize()` (conjugate gradient, ~100 iterations) which finds a different local optimum from Python's `L-BFGS-B`. For the 35°C single-cell ARD (Fig 3c, 299 training points) both optimizers agree: **#91 (17.80 Hz)** is top. For the 25°C four-cell ARD (Fig 1c, 760 training points), sklearn finds **#91 and #100 in the top-5** but does not rank them first — a known consequence of the higher-dimensional local-minima landscape with multi-cell data. Training on a single 25°C cell (25C02, 250 rows) recovers **#100 (2.16 Hz) as top-1**, consistent with the paper's finding.
+
 ### ARD weight formula (paper Methods, Eq. 4)
 
 ```python
