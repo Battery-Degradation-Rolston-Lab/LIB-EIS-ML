@@ -11,21 +11,25 @@ Uses Gaussian Process Regression (GPR) on full EIS spectra (120 features = 60 fr
 
 ## Reproduced Results
 
-| Figure | Description | Our R² | Paper R² | Status |
-|--------|-------------|--------|----------|--------|
-| Fig 1a | Single-T 25°C capacity (25C05) | **0.882** | 0.88 | ✅ |
+| Figure | Description | Our R² / Result | Paper R² | Status |
+|--------|-------------|-----------------|----------|--------|
+| Fig 1a | Single-T 25°C capacity (25C05) | **0.882** | 0.88 | ✅ matched |
+| Fig 1b | Single-T 25°C capacity scatter (all cells) | — | — | ✅ generated |
 | Fig 1c | ARD weights 25°C (top features) | #108 top; #100, #91 in top-5 | #91, #100 dominant | ≈ |
 | Fig 2  | Single-T 25°C RUL (25C05/06/07/08) | 0.84 / 0.95 / 0.76 / **−0.33** | 0.96 / 0.73 / 0.68 / 0.81 | ⚠️ |
 | Fig 3a | Multi-T 35°C capacity | **0.91** | 0.81 | ✅ beat |
 | Fig 3b | Multi-T 45°C capacity | **0.94** | 0.72 | ✅ beat |
 | Fig 3c | ARD weights 35°C (top feature) | **#91** | #91 | ✅ exact |
-| Fig 4a | Multi-T 25°C RUL (25C05) | not reproduced | 0.87 | — |
+| Fig 3d | ARD weights 45°C (top feature) | **#88** | #91 | ≈ (same low-freq region) |
+| Fig 4a | Multi-T 25°C RUL (25C05) | **0.970** | 0.87 | ✅ beat |
 | Fig 4b | Multi-T 35°C RUL (35C02) | **0.85** | 0.75 | ✅ beat |
-| Fig 4c | Multi-T 45°C RUL (45C02) | **0.91** | 0.92 | ✅ |
+| Fig 4c | Multi-T 45°C RUL (45C02) | **0.91** | 0.92 | ✅ matched |
 
 **Note on Fig 2 / 25C08 (R²=−0.33):** The paper reports R²=0.81 for 25C08 and claims the model "accurately predicts the RUL of all four testing cells." We obtain −0.33. Verified causes: (1) 25C08's EIS barely changes over its lifetime (feature #91 std=0.002 vs 0.032 for training cells — a different degradation mechanism), and (2) the Zenodo capacity file for 25C08 covers only 37 cycles while the EIS file records 86 measurements, suggesting the authors may have used internal data not fully reflected in the public Zenodo release.
 
-**Note on Fig 4a:** Not reproduced in the current script. Uses the same multi-T model as Fig 4b/4c but tests on 25C05 (EoL=150, R²=0.87 per paper).
+**Note on Fig 3d / ARD 45°C:** We find top feature #88 (L-BFGS-B local minimum) vs paper's #91. Both lie in the same low-frequency Im(Z) region (~17–20 Hz), 3 predictor indices apart — the same SEI-probing frequency range. Same optimizer divergence as Fig 1c.
+
+**Note on Fig 4a:** R²=0.970 substantially exceeds the paper's 0.87. The multi-T model generalises strongly to 25C05; the higher R² reflects that the 25C05 cell (EoL≈150 cycles) has a smooth, monotone RUL trajectory well captured by the linear kernel.
 
 ### Key scientific finding reproduced
 **Feature #91 (17.80 Hz) is the universal degradation indicator** — dominant across all temperatures (Fig 3c). At 25°C only, feature #100 (2.16 Hz) also appears, because it's sensitive to both temperature *and* degradation; multi-temperature training acts as a regulariser that strips it out.

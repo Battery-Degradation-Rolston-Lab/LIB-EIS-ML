@@ -7,15 +7,18 @@ KEY FINDING: L-BFGS maximises training log-MLL to a dead-kernel local optimum
 it found a useful intermediate l.  Fix: fix l at the sweet-spot value found by
 grid-search.  Same for the linear model: normalize_y=False + alpha=0.4.
 
-Targets (achieved):
-  Fig 3a : Multi-T  35C cap  R2>=0.81  -> ~0.91 (beat)
-  Fig 4b : Multi-T  35C RUL  R2>=0.75  -> ~0.85 (beat)
-  Fig 3c : Multi-T  35C ARD  top=#91   -> #91   (exact)
+Figures reproduced:
   Fig 1a : Single-T 25C cap  R2>=0.88  -> ~0.88 (25C05 only, joint norm l=1000)
+  Fig 1b : Single-T 25C cap  scatter   (measured vs estimated, all 4 cells)
   Fig 1c : Single-T 25C ARD  top=#91+#100
   Fig 2  : Single-T 25C RUL  R2/cell   -> 25C05~0.84 25C06~0.95 25C07~0.76
-           (25C08 out-of-distribution in Zenodo Zenodo data)
+           (25C08 out-of-distribution in Zenodo data)
+  Fig 3a : Multi-T  35C cap  R2>=0.81  -> ~0.91 (beat)
   Fig 3b : Multi-T  45C cap  R2>=0.72  -> ~0.94 (beat)
+  Fig 3c : Multi-T  35C ARD  top=#91   -> #91   (exact)
+  Fig 3d : Multi-T  45C ARD  top=#91   -> #91   (expected)
+  Fig 4a : Multi-T  25C RUL  R2>=0.87  (25C05, paper target)
+  Fig 4b : Multi-T  35C RUL  R2>=0.75  -> ~0.85 (beat)
   Fig 4c : Multi-T  45C RUL  R2>=0.92  -> ~0.91 (within 1%)
 """
 
@@ -261,6 +264,51 @@ print(f"  Saved -> {OUT / 'fig3c_ARD_weights.png'}")
 
 
 # ============================================================================
+# MODEL 3d -- ARD-GPR  (Fig 3d)  -- 45degC
+# Kernel: ARD-SE (one l per feature), trained on 45C01 state-V data only
+# EIS_data_45.txt contains all 9 states × 299 cycles for 45C01.
+# State V = block index 4 (rows 1196:1495), verified by exact match with
+# rows 1059:1358 of EIS_data.txt (multi-T training 45C01 block).
+# Expected top feature: #91 (17.80 Hz) -- same as 35°C.
+# ============================================================================
+print("\n" + "=" * 60)
+print("MODEL 3d -- ARD-GPR  (Fig 3d)  -- 45degC")
+print("=" * 60)
+
+EIS_45_all  = np.loadtxt(DATA / "EIS_data_45.txt")
+EIS_45c01_V = EIS_45_all[1196:1495]          # state V block (verified match)
+Cap_45_tr   = load("Capacity_data_45.txt").ravel()   # 299 capacities for 45C01
+assert len(EIS_45c01_V) == len(Cap_45_tr), "45C shape mismatch"
+
+_mu45 = EIS_45c01_V.mean(0); _sig45 = EIS_45c01_V.std(0, ddof=1); _sig45[_sig45==0]=1
+X_ard45 = (EIS_45c01_V - _mu45) / _sig45
+
+print("  Fitting sklearn ARD-GPR (L-BFGS-B, 3 restarts) on 45C01 state-V data ...")
+gpr_ard45 = fit_ard_gpr(X_ard45, Cap_45_tr, n_feat=120, n_restarts=3)
+
+weights45 = ard_weights(gpr_ard45)
+top_feat45 = int(np.argmax(weights45)) + 1
+top5_45    = (np.argsort(weights45)[::-1][:5] + 1).tolist()
+print(f"  Most informative predictor: #{top_feat45}  (paper: #91)")
+print(f"  Top-5: {top5_45}")
+
+fig, ax = plt.subplots(figsize=(9, 5))
+ax.semilogx(np.arange(1, 121), weights45, "bo", ms=5)
+ax.annotate(f"#{top_feat45}",
+            xy=(top_feat45, weights45[top_feat45 - 1]),
+            xytext=(max(top_feat45 * 1.5, top_feat45 + 5), weights45[top_feat45 - 1] * 1.02),
+            fontsize=12, color="navy",
+            arrowprops=dict(arrowstyle="->", color="navy"))
+ax.set_xlabel("Predictor index", fontsize=14)
+ax.set_ylabel("Predictor weight", fontsize=14)
+ax.set_title(f"ARD-GPR -- Feature importance (45°C)  top=#{top_feat45}", fontsize=13)
+fig.patch.set_facecolor("white"); ax.set_facecolor("white")
+plt.tight_layout()
+fig.savefig(OUT / "fig3d_ARD_weights_45C.png", dpi=150)
+print(f"  Saved -> {OUT / 'fig3d_ARD_weights_45C.png'}")
+
+
+# ============================================================================
 # MODEL 4 -- Single-T 25degC EIS-Capacity GPR  (Fig 1a + Fig 1c)
 # Kernel: fixed RBF l=1000 (Fig 1a); ARD-SE (Fig 1c)
 # Train: GitHub 25C01-04 = EIS_data.txt rows 0:760
@@ -351,6 +399,32 @@ fig.patch.set_facecolor("white"); ax.set_facecolor("white")
 plt.tight_layout()
 fig.savefig(OUT / "fig1c_ARD_weights_25C.png", dpi=150)
 print(f"  Saved -> {OUT / 'fig1c_ARD_weights_25C.png'}")
+
+# Fig 1b -- Measured vs estimated capacity scatter (all 4 test cells, normalised)
+# Paper Fig 1b: x-axis = measured capacity / cap[0], y-axis = estimated / cap[0]
+# Each cell normalised by ITS OWN starting capacity
+print("  Generating Fig 1b -- capacity scatter (all 4 cells) ...")
+COLORS_4 = [BLUE, RED, GREEN, np.array([0.6, 0.2, 0.8])]
+MARKERS_4 = ["o", "s", "^", "D"]
+LABELS_4  = ["25C05", "25C06", "25C07", "25C08"]
+fig, ax = plt.subplots(figsize=(6, 6))
+for i, (s, e) in enumerate(cell25_slices):
+    cap_m = Cap_25te[s:e]
+    cap_p = Y_pred_fig1[s:e]
+    cap0m_i = cap_m[0]; cap0p_i = cap_p[0]
+    ax.scatter(cap_m / cap0m_i, cap_p / cap0p_i,
+               color=COLORS_4[i], marker=MARKERS_4[i], s=18, alpha=0.7,
+               label=LABELS_4[i])
+ax.plot([0.5, 1.05], [0.5, 1.05], "k--", lw=1, alpha=0.4)
+ax.set_xlim(0.55, 1.05); ax.set_ylim(0.55, 1.05)
+ax.set_xlabel("Measured capacity", fontsize=13)
+ax.set_ylabel("Predicted capacity", fontsize=13)
+ax.set_title("Single-T 25°C capacity -- all test cells (Fig 1b)", fontsize=12)
+ax.legend(frameon=False, fontsize=11)
+fig.patch.set_facecolor("white"); ax.set_facecolor("white")
+plt.tight_layout()
+fig.savefig(OUT / "fig1b_capacity_scatter_25C.png", dpi=150)
+print(f"  Saved -> {OUT / 'fig1b_capacity_scatter_25C.png'}")
 
 
 # ============================================================================
@@ -497,19 +571,61 @@ fig.savefig(OUT / "fig4c_rul_45C02.png", dpi=150)
 print(f"  Saved -> {OUT / 'fig4c_rul_45C02.png'}")
 
 
+# ============================================================================
+# MODEL 8 -- Multi-T 25degC EIS-RUL GPR  (Fig 4a)
+# Reuses gpr_rul from Model 2.  Paper target R2 = 0.87  (EoL=150, 25C05)
+# Normalisation: same mu/sig from EIS_data.txt (full 1358 rows, multi-T)
+# ============================================================================
+print("\n" + "=" * 60)
+print("MODEL 8 -- Multi-T 25degC EIS-RUL GPR  (Fig 4a)")
+print("=" * 60)
+
+EIS_rul_25c05 = load("EIS_rul_25C05.txt")
+rul_25c05     = load("rul_25C05.txt").ravel()   # 77 rows: 152->0
+
+X_25c05_rul = norm(EIS_rul_25c05, mu, sig)   # same mu/sig as multi-T model
+Y_pred_4a, Y_std_4a = gpr_rul.predict(X_25c05_rul, return_std=True)
+
+r2_fig4a = r2_score(rul_25c05, Y_pred_4a)
+print(f"  25C05 RUL: n={len(rul_25c05)}, max={rul_25c05.max():.0f}")
+print(f"  R2 = {r2_fig4a:.4f}   (paper target: 0.87)")
+
+fig, ax = plt.subplots(figsize=(7, 6))
+ax.fill_between(rul_25c05, Y_pred_4a - Y_std_4a, Y_pred_4a + Y_std_4a,
+                color=LGREEN, alpha=0.8)
+ax.plot(rul_25c05, Y_pred_4a, "h", color=GREEN, ms=6, mfc=GREEN, lw=1,
+        label="Predicted vs Actual")
+ax.plot([0, rul_25c05.max()], [0, rul_25c05.max()], "k--", lw=1, alpha=0.4,
+        label="Perfect")
+ax.set_xlim(0, rul_25c05.max() + 10)
+ax.set_ylim(0, rul_25c05.max() + 20)
+ax.set_xlabel("Actual RUL", fontsize=13)
+ax.set_ylabel("Predicted RUL", fontsize=13)
+ax.set_title(f"25C05 -- Multi-T EIS-RUL GPR  (R2={r2_fig4a:.3f})", fontsize=12)
+ax.text(0.55, 0.08, f"R² = {r2_fig4a:.2f}", transform=ax.transAxes, fontsize=14,
+        fontweight='bold', color='darkgreen')
+ax.legend(frameon=False, fontsize=11); fig.patch.set_facecolor("white")
+plt.tight_layout()
+fig.savefig(OUT / "fig4a_rul_25C05_multiT.png", dpi=150)
+print(f"  Saved -> {OUT / 'fig4a_rul_25C05_multiT.png'}")
+
+
 # -- Final summary ------------------------------------------------------------
 print()
 print("=" * 60)
 print("RESULTS SUMMARY")
 print("=" * 60)
-print(f"  [Fig 3a] Multi-T  35C cap  R2 = {r2_cap:.4f}   (paper: 0.81)")
-print(f"  [Fig 4b] Multi-T  35C RUL  R2 = {r2_rul:.4f}   (paper: 0.75)")
-print(f"  [Fig 3c] ARD 35C  top feat : #{top_feat}        (paper: #91)")
 print(f"  [Fig 1a] Single-T 25C cap  R2(25C05)={r2_fig1_25c05:.4f}  R2(all)={r2_fig1_all:.4f}   (paper: 0.88 for 25C05)")
-print(f"  [Fig 1c] ARD 25C  top feat : #{top_fig1}  top-5={top5_fig1}")
+print(f"  [Fig 1b] Single-T 25C cap  scatter (all 4 cells) -- see fig1b_capacity_scatter_25C.png")
+print(f"  [Fig 1c] ARD 25C  top feat : #{top_fig1}  top-5={top5_fig1}  (paper: #91 and #100)")
 print(f"  [Fig 2 ] Single-T 25C RUL  R2/cell: " +
       " | ".join(f"{c}={r2_fig2_cells[c]:.2f}" for c in fig2_test_cells))
+print(f"  [Fig 3a] Multi-T  35C cap  R2 = {r2_cap:.4f}   (paper: 0.81)")
 print(f"  [Fig 3b] Multi-T  45C cap  R2 = {r2_fig3b:.4f}   (paper: 0.72)")
+print(f"  [Fig 3c] ARD 35C  top feat : #{top_feat}        (paper: #91)")
+print(f"  [Fig 3d] ARD 45C  top feat : #{top_feat45}  top-5={top5_45}  (paper: #91)")
+print(f"  [Fig 4a] Multi-T  25C RUL  R2 = {r2_fig4a:.4f}   (paper: 0.87)")
+print(f"  [Fig 4b] Multi-T  35C RUL  R2 = {r2_rul:.4f}   (paper: 0.75)")
 print(f"  [Fig 4c] Multi-T  45C RUL  R2 = {r2_fig4c:.4f}   (paper: 0.92)")
 print()
 print("  Figures saved to ./output/")
