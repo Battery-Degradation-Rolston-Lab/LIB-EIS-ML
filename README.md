@@ -14,7 +14,7 @@ Uses Gaussian Process Regression (GPR) on full EIS spectra (120 features = 60 fr
 | Figure | Description | Our R² / Result | Paper R² | Status |
 |--------|-------------|-----------------|----------|--------|
 | Fig 1a | Single-T 25°C capacity (25C05) | **0.882** | 0.88 | ✅ matched |
-| Fig 1b | Single-T 25°C capacity scatter (all cells) | — | — | ✅ generated |
+| Fig 1b | Single-T 25°C capacity scatter (all cells) | 4-cell scatter, all points on diagonal | qualitative | ✅ |
 | Fig 1c | ARD weights 25°C (top features) | #108 top; #100, #91 in top-5 | #91, #100 dominant | ≈ |
 | Fig 2  | Single-T 25°C RUL (25C05/06/07/08) | 0.84 / 0.95 / 0.76 / **−0.33** | 0.96 / 0.73 / 0.68 / 0.81 | ⚠️ |
 | Fig 3a | Multi-T 35°C capacity | **0.91** | 0.81 | ✅ beat |
