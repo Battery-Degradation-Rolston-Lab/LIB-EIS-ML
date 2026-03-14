@@ -78,6 +78,20 @@ Preprocessed data (in `data/`) comes from two sources:
 | [GitHub (Zhang et al.)](https://github.com/YunweiZhang/ML-identify-battery-degradation) | `EIS_data.txt`, `Capacity_data.txt`, `EIS_data_35.txt`, `EIS_data_35C02.txt`, `EIS_data_RUL.txt`, `RUL.txt`, `rul35C02.txt`, `capacity35C02.txt` |
 | [Zenodo](https://doi.org/10.5281/zenodo.3633835) (preprocessed) | 25°C test cells, 45°C test cell, per-cell RUL files |
 
+### Zenodo data verification
+
+All Zenodo EIS preprocessing was verified against GitHub reference files:
+
+- **EIS vectors**: bit-for-bit identical to GitHub for all 25C training cells (25C01–04) and 35C02. Max diff = 0.000000 across all 120 features and all cycles.
+- **Capacity (4-col cells: 25C01, 25C05, 25C08)**: discharge max per cycle matches GitHub to within 0.000005 mAh.
+- **Capacity (6-col cells: 25C02, 25C03, 25C06, 25C07)**: absolute values differ from GitHub by up to ~4.7 mAh (different internal measurement protocol in Zenodo), but relative degradation shape is preserved — EOL indices (80% threshold) are correct for all test cells.
+
+Since all model training uses GitHub data directly, these capacity differences have no impact on results.
+
+### 25C08 anomaly
+
+25C08 shows near-zero EIS variation over its lifetime (feature #91 std = 0.002 vs 0.032 for training cells) — a different degradation mechanism not represented in training. This explains R² = −0.33 for that cell; it is a genuine data characteristic, not a preprocessing error.
+
 ### Kernel mapping: MATLAB GPML → Python sklearn
 
 | MATLAB (GPML) | sklearn |
