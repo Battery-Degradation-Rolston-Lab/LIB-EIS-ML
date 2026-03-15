@@ -101,6 +101,66 @@ Since all model training uses GitHub data directly, these capacity differences h
 
 25C08 shows near-zero EIS variation over its lifetime (feature #91 std = 0.002 vs 0.032 for training cells) — a different degradation mechanism not represented in training. This explains R² = −0.33 for that cell; it is a genuine data characteristic, not a preprocessing error.
 
+---
+
+## New Dataset: A1–A8 (High C-Rate, Room Temperature)
+
+Application of the same GPR architecture to a new in-house dataset of 8 large-format cells (~4000 mAh, High C-Rate, 25°C).
+
+### EIS state selection
+
+| Protocol step | Ns | Description | Paper analogue |
+|---|---|---|---|
+| Ns=1 | Before charge | PEIS 10 kHz → 10 mHz (48 freqs) | State I |
+| **Ns=6** | **After charge** | **PEIS 10 kHz → 1 Hz (33 freqs)** | **State V ← used** |
+
+**Ns=6 chosen** because it matches the paper's State V (after full charge + rest). Feature #91 (17.80 Hz) is captured exactly in Ns=6. The 33 measured frequencies are log-linearly interpolated to the paper's 60-frequency Zenodo grid before normalisation.
+
+### Dataset summary
+
+| Cell | Role | Initial Cap | EoL cycle | RUL_max |
+|------|------|------------|-----------|---------|
+| A1 | Train | 4060 mAh | 174 | 348 |
+| A2 | Train | 4060 mAh | 168 | 336 |
+| A3 | Train | 3800 mAh | 216 | 432 |
+| A4 | Train | 4030 mAh | 140 | 280 |
+| A5 | Test  | 3860 mAh | 116 | 232 |
+| A6 | Test  | 4050 mAh | DNF | — |
+| A7 | Test  | 4040 mAh | 95 | 190 |
+| A8 | Test  | 4040 mAh | 224 | 448 |
+
+A6 did not reach 80% capacity fade within its recorded lifetime.
+
+### Results
+
+| Model | A5 | A6 | A7 | A8 |
+|---|---|---|---|---|
+| Capacity GPR (RBF l=30, joint norm) | **0.97** | **0.79** | **0.99** | **0.95** |
+| RUL GPR (Linear, train norm) | 0.68 | DNF | −0.75 | 0.74 |
+
+**Capacity**: Excellent across all 4 test cells. Joint normalisation (same fix as paper's Fig 1a) removes cell-to-cell impedance offset.
+
+**RUL A7 fails (R²=−0.75)**: A7 reaches EoL at cycle 95, earlier than all training cells (140–216). The model extrapolates outside its training range — same root cause as 25C08 in the paper.
+
+### ARD: dominant frequencies for high C-rate cells
+
+| Rank | Feature | Part | Frequency | Weight |
+|------|---------|------|-----------|--------|
+| 1 | #5 | Re(Z) | 7835 Hz | 0.436 |
+| 2 | #109 | Im(Z) | 0.26 Hz | 0.424 |
+| 3 | #91 | Im(Z) | **17.80 Hz** | 0.133 |
+
+Unlike the paper's 1C cells (where #91 dominates), high C-rate cycling shifts dominance to high-frequency ohmic resistance (#5, 7835 Hz) and very low-frequency diffusion (#109, 0.26 Hz). This is physically consistent: lithium plating and electrolyte degradation (high C-rate mechanisms) show up at high frequencies, while diffusion limitation appears at very low frequencies. The SEI feature (#91, 17.80 Hz) is still third-ranked, confirming it contributes to degradation at all C-rates.
+
+### Scripts
+
+```bash
+python preprocess_new_dataset.py   # extract Ns=6 EIS + capacity from Battery data.zip
+python run_new_dataset.py          # train A1-A4, test A5-A8, generate figures
+```
+
+---
+
 ### Kernel mapping: MATLAB GPML → Python sklearn
 
 | MATLAB (GPML) | sklearn |
