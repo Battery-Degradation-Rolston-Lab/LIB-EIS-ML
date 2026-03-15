@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+
+# Raw data — large Zenodo files (not tracked; reproduce via preprocess scripts)
+raw_data/zenodo_eis/
+raw_data/zenodo_capacity/
+raw_data/Battery data.zip
+
+# OS artifacts
+.DS_Store
+desktop.ini
+__MACOSX/
+
+# Editor
+.vscode/
+*.swp
