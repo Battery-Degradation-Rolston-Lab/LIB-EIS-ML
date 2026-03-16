@@ -235,22 +235,25 @@ for f in top5:
     freq = feat_freqs[f-1]
     print(f'    Feature #{f} ({part} @ {freq:.4f} Hz)  w={weights[f-1]:.4f}')
 
-# ARD weight plot — annotate x-axis with frequency labels
+# ARD weight plot — match paper style (semilogx, linear y 0-1, colour-coded Re/Im)
 fig, ax = plt.subplots(figsize=(11, 4))
-ax.scatter(np.arange(1, 67), weights, s=15, color='pink', alpha=0.8)
-ax.scatter(top5, weights[top5-1], s=70, color='red', zorder=5)
+idx = np.arange(1, 67)
+re_mask = idx <= 33
+im_mask = ~re_mask
+ax.semilogx(idx[re_mask], weights[re_mask], 'bo', ms=5, label='Re(Z)')
+ax.semilogx(idx[im_mask], weights[im_mask], 'rs', ms=5, label='-Im(Z)')
+ax.semilogx(top5, weights[top5-1], 'k*', ms=12, zorder=5, label='top features')
 for f in top5[:3]:
     freq = feat_freqs[f-1]
-    part = 'Re' if f <= 33 else 'Im'
-    ax.annotate(f'#{f}\n{freq:.1f}Hz\n({part})',
+    part = 'Re(Z)' if f <= 33 else '-Im(Z)'
+    ax.annotate(f'#{f}  {freq:.1f} Hz\n({part})',
                 (f, weights[f-1]),
-                textcoords='offset points', xytext=(5, 5), fontsize=7)
-ax.set_xlabel('Feature index (1-66:  1-33=Re(Z), 34-66=Im(Z),  high→low freq each)')
-ax.set_ylabel('ARD weight  exp(-sigma_m)')
-ax.set_title('ARD Feature Importance — A1-A4 training (Ns=6 native 33-freq EIS, no extrapolation)')
-ax.axvline(33.5, color='gray', lw=0.8, ls='--', label='Re|Im boundary')
-ax.legend(fontsize=8)
-ax.set_yscale('log')
+                textcoords='offset points', xytext=(6, 4), fontsize=8)
+ax.set_xlabel('Predictor index', fontsize=14)
+ax.set_ylabel('Predictor weight', fontsize=14)
+ax.set_title('ARD Feature Importance — A1-A4 training (Ns=6 native 33-freq EIS)', fontsize=13)
+ax.set_ylim(0, 1)
+ax.legend(fontsize=9)
 ax.grid(True, alpha=0.3)
 plt.tight_layout()
 plt.savefig(OUT / 'fig_ARD_A1-A4.png', dpi=150)
