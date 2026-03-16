@@ -259,3 +259,80 @@ print(f'  {"Mean":<6}  {mean_lin:>10.4f}  {mean_rbf:>10.4f}')
 print(f'\n  Note: RBF kernel deviates from paper eq.(5); '
       f'linear kernel is the faithful reproduction.')
 print(f'  Figures saved to: {OUT}')
+
+# ===========================================================================
+# MODEL 3 — ARD LOOCV  (fold-averaged, frequency x-axis, ±1 std bands)
+# Comparison plot alongside existing single-run ARD — does NOT replace it.
+# ===========================================================================
+print('\n' + '='*60)
+print('MODEL 3 — ARD weights across LOOCV folds (fold-averaged)')
+print('='*60)
+
+NATIVE_FREQS = np.array([
+    10000.0, 7500.0, 5620.0, 4220.0, 3160.0, 2370.0, 1780.0, 1330.0,
+    1000.0,  750.0,  564.0,  422.0,  316.0,  237.0,  178.0,  135.0,
+    102.0,   75.0,   56.2,   42.2,   31.6,   23.7,   17.8,   13.3,
+    10.0,    7.5,    5.62,   4.22,   3.16,   2.37,   1.78,   1.33,  0.999
+])  # 33 freqs, high → low  (same order as feature vector)
+
+fold_weights_re = []   # shape: (n_folds, 33)
+fold_weights_im = []
+
+for test_cell in ALL_CELLS:
+    train_cells = [c for c in ALL_CELLS if c != test_cell]
+
+    EIS_tr = np.vstack([cell_eis[c] for c in train_cells])
+    Cap_tr = np.concatenate([cell_cap[c] for c in train_cells])
+    EIS_te = cell_eis[test_cell]
+
+    # Joint norm (same as capacity LOOCV)
+    EIS_all = np.vstack([EIS_tr, EIS_te])
+    _, mu_x, sig_x = zscore(EIS_all)
+    X_tr_n = apply_norm(EIS_tr, mu_x, sig_x)
+
+    # ARD-RBF kernel (one length-scale per feature)
+    k_ard = (ConstantKernel(1.0) *
+             RBF(length_scale=np.ones(66)) +
+             WhiteKernel(noise_level=1.0))
+    gpr_ard = GaussianProcessRegressor(kernel=k_ard, normalize_y=True,
+                                        alpha=0.1, n_restarts_optimizer=2)
+    gpr_ard.fit(X_tr_n, Cap_tr)
+
+    ls = gpr_ard.kernel_.k1.k2.length_scale   # 66 values
+    w  = np.exp(-ls)
+    w /= w.sum()
+
+    fold_weights_re.append(w[:33])   # Re(Z) features
+    fold_weights_im.append(w[33:])   # Im(Z) features
+    print(f'  fold leave-{test_cell}: top Re freq={NATIVE_FREQS[np.argmax(w[:33])]:.1f} Hz  '
+          f'top Im freq={NATIVE_FREQS[np.argmax(w[33:])]:.1f} Hz')
+
+fold_weights_re = np.array(fold_weights_re)   # (8, 33)
+fold_weights_im = np.array(fold_weights_im)   # (8, 33)
+
+mean_re = fold_weights_re.mean(0)
+std_re  = fold_weights_re.std(0)
+mean_im = fold_weights_im.mean(0)
+std_im  = fold_weights_im.std(0)
+
+# Frequencies plotted low → high (left → right) to match reference style
+freqs_plot = NATIVE_FREQS[::-1]          # 0.999 → 10000 Hz
+mr = mean_re[::-1]; sr = std_re[::-1]
+mi = mean_im[::-1]; si = std_im[::-1]
+
+fig, ax = plt.subplots(figsize=(12, 4))
+ax.semilogx(freqs_plot, mr, 'r-^', ms=5, lw=1.5, label='Re(Z) Ns6 (charged)')
+ax.fill_between(freqs_plot, mr - sr, mr + sr, color='red', alpha=0.15)
+ax.semilogx(freqs_plot, mi, color='orange', linestyle='--', marker='v',
+            ms=5, lw=1.5, label='-Im(Z) Ns6 (charged)')
+ax.fill_between(freqs_plot, mi - si, mi + si, color='orange', alpha=0.15)
+ax.axhline(0, color='black', lw=0.6, ls='-')
+ax.set_xlabel('Frequency (Hz)', fontsize=13)
+ax.set_ylabel('ARD weight', fontsize=13)
+ax.set_title('ARD weights across folds', fontsize=13)
+ax.legend(fontsize=9)
+ax.grid(True, alpha=0.3)
+plt.tight_layout()
+plt.savefig(OUT / 'fig_ARD_loocv_folds.png', dpi=150)
+plt.close()
+print(f'  Saved: fig_ARD_loocv_folds.png')

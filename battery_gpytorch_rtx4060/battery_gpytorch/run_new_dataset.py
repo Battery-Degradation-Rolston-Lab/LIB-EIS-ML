@@ -261,6 +261,96 @@ plt.close()
 print(f'  Saved → {OUT}/fig_ARD_A1-A4.png')
 
 # ---------------------------------------------------------------------------
+# MODEL 4 — LOOCV fold-averaged ARD  (frequency x-axis, mean ± std across folds)
+# Keeps existing fig_ARD_A1-A4.png unchanged — this is a companion comparison plot
+# ---------------------------------------------------------------------------
+print('\n' + '='*60)
+print('MODEL 4 — LOOCV fold-averaged ARD  (frequency x-axis)')
+print('='*60)
+
+ALL_CELLS = [f'A{i}' for i in range(1, 9)]
+
+# Load per-cell EIS and capacity for all 8 cells
+cell_eis_all = {}
+cell_cap_all = {}
+for c in ALL_CELLS:
+    eis_path = DATA / f'EIS_{c}.txt'
+    cap_path = DATA / f'cap_{c}.txt'
+    if eis_path.exists() and cap_path.exists():
+        cell_eis_all[c] = np.loadtxt(eis_path)
+        cell_cap_all[c] = np.loadtxt(cap_path)
+
+available_cells = [c for c in ALL_CELLS if c in cell_eis_all]
+print(f'  Available cells: {available_cells}')
+
+fold_weights = []  # one (66,) array per fold
+
+for test_cell in available_cells:
+    train_cells = [c for c in available_cells if c != test_cell]
+
+    EIS_tr_f = np.vstack([cell_eis_all[c] for c in train_cells])
+    Cap_tr_f = np.concatenate([cell_cap_all[c] for c in train_cells])
+    EIS_te_f = cell_eis_all[test_cell]
+
+    # Joint normalisation (train + test pooled) — same as capacity LOOCV
+    EIS_all_f = np.vstack([EIS_tr_f, EIS_te_f])
+    _, mu_f, sig_f = zscore(EIS_all_f.copy())
+    X_tr_f_n = apply_norm(EIS_tr_f, mu_f, sig_f)
+
+    k_ard = ConstantKernel(1.0) * RBF(length_scale=np.ones(66)) + WhiteKernel(noise_level=1.0)
+    gpr_f = GaussianProcessRegressor(kernel=k_ard, normalize_y=True,
+                                     n_restarts_optimizer=2, alpha=0.1)
+    print(f'  Fold {test_cell}: fitting ARD on {len(X_tr_f_n)} samples ...')
+    gpr_f.fit(X_tr_f_n, Cap_tr_f)
+
+    ls_f = gpr_f.kernel_.k1.k2.length_scale
+    w_f  = np.exp(-ls_f)
+    w_f /= w_f.sum()
+    fold_weights.append(w_f)
+
+fold_weights = np.array(fold_weights)   # (n_folds, 66)
+w_mean = fold_weights.mean(0)
+w_std  = fold_weights.std(0)
+
+# Plot — frequency x-axis, Re and Im overlaid, mean ± std shaded
+fig, ax = plt.subplots(figsize=(12, 5))
+
+re_freqs = NATIVE_FREQS          # features 1-33:  Re(Z), high→low
+im_freqs = NATIVE_FREQS          # features 34-66: Im(Z), high→low
+re_w_mean = w_mean[:33]
+re_w_std  = w_std[:33]
+im_w_mean = w_mean[33:]
+im_w_std  = w_std[33:]
+
+# Plot low→high frequency (reverse) to match comparison figure style
+freq_plot = re_freqs[::-1]
+re_m = re_w_mean[::-1];  re_s = re_w_std[::-1]
+im_m = im_w_mean[::-1];  im_s = im_w_std[::-1]
+
+ax.plot(freq_plot, re_m, 'r-^', lw=1.5, ms=5, label='Re(Z) Ns6 (charged)')
+ax.fill_between(freq_plot, re_m - re_s, re_m + re_s, alpha=0.25, color='red')
+ax.plot(freq_plot, im_m, color='orange', linestyle='--', marker='v',
+        lw=1.5, ms=5, label='-Im(Z) Ns6 (charged)')
+ax.fill_between(freq_plot, im_m - im_s, im_m + im_s, alpha=0.25, color='orange')
+
+ax.set_xscale('log')
+ax.set_xlabel('Frequency (Hz)', fontsize=13)
+ax.set_ylabel('ARD weight', fontsize=13)
+ax.set_title('ARD weights across folds', fontsize=13)
+ax.legend(fontsize=10)
+ax.grid(True, alpha=0.3)
+plt.tight_layout()
+plt.savefig(OUT / 'fig_ARD_loocv_freq.png', dpi=150)
+plt.close()
+print(f'  Saved → {OUT}/fig_ARD_loocv_freq.png')
+
+# Print dominant frequencies
+top_re = np.argsort(re_w_mean)[::-1][:3]
+top_im = np.argsort(im_w_mean)[::-1][:3]
+print(f'  Top Re(Z) freqs: {[(f"{NATIVE_FREQS[i]:.1f} Hz", round(re_w_mean[i],3)) for i in top_re]}')
+print(f'  Top Im(Z) freqs: {[(f"{NATIVE_FREQS[i]:.1f} Hz", round(im_w_mean[i],3)) for i in top_im]}')
+
+# ---------------------------------------------------------------------------
 # SUMMARY
 # ---------------------------------------------------------------------------
 print('\n' + '='*60)
