@@ -27,3 +27,21 @@ EIS encodes current health, not remaining life. Use capacity-derived RUL instead
 
 **ARD weight formula**: Paper eq. is `w = exp(−σ_m)` then normalise. NOT `exp(-10^log(σ))`.
 The latter is a MATLAB approximation artifact. Always use the linear-space formula.
+
+---
+
+## 2026-03-20
+
+**Do not infer degradation mechanism from Re(Z) trend alone**: Observing that Re(Z) rises
+monotonically with cycling does NOT mean degradation is ohmic/electrolyte-driven. Re(Z) and
+Im(Z) at the same frequency are coupled by the Kramers-Kronig relations — a change in Im(Z)
+at the SEI frequency necessarily perturbs Re(Z) at all other frequencies. The Re(Z) increase
+could be a K-K shadow of SEI growth, not an independent ohmic process. Never attribute a
+physical mechanism to Re(Z) alone without considering the coupled (Re, Im) structure.
+
+**ARD on decoupled Re/Im features is physically ambiguous**: The current feature vector
+[Re(ω₁)...Re(ωₙ), Im(ω₁)...Im(ωₙ)] treats Re and Im as independent features. ARD
+importance scores on this representation are misleading — predictive power attributed to
+Re(ω) at one frequency may actually belong to the coupled (Re, Im) structure at another
+frequency via K-K. The correct representation pairs (Re, Im) per frequency point and assigns
+one ARD length-scale per ω.

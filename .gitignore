@@ -19,3 +19,16 @@ __MACOSX/
 # Editor
 .vscode/
 *.swp
+
+# Claude internal memory/config
+.claude/
+
+# Office temp files
+~$*
+
+# PowerPoint and presentation artefacts
+*.pptx
+make_ppt.py
+add_paper2_slides.py
+add_speaker_notes.py
+paper_text.txt
