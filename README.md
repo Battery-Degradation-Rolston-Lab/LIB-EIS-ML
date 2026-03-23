@@ -114,49 +114,79 @@ Application of the same GPR architecture to a new in-house dataset of 8 large-fo
 | Ns=1 | Before charge | PEIS 10 kHz → 10 mHz (48 freqs) | State I |
 | **Ns=6** | **After charge** | **PEIS 10 kHz → 1 Hz (33 freqs)** | **State V ← used** |
 
-**Ns=6 chosen** because it matches the paper's State V (after full charge + rest). Feature #91 (17.80 Hz) is captured exactly in Ns=6. The 33 measured frequencies are log-linearly interpolated to the paper's 60-frequency Zenodo grid before normalisation.
+**Ns=6 chosen** because it matches the paper's State V (after full charge + rest). Native 33 measured frequencies are used directly (66 features = Re(Z) + Im(Z)) — no interpolation to the Zenodo 60-frequency grid. Sub-1 Hz extrapolation was avoided as it falls outside the measured range.
 
 ### Dataset summary
 
-| Cell | Role | Initial Cap | EoL cycle | RUL_max |
-|------|------|------------|-----------|---------|
-| A1 | Train | 4060 mAh | 174 | 348 |
-| A2 | Train | 4060 mAh | 168 | 336 |
-| A3 | Train | 3800 mAh | 216 | 432 |
-| A4 | Train | 4030 mAh | 140 | 280 |
-| A5 | Test  | 3860 mAh | 116 | 232 |
-| A6 | Test  | 4050 mAh | DNF | — |
-| A7 | Test  | 4040 mAh | 95 | 190 |
-| A8 | Test  | 4040 mAh | 224 | 448 |
+`DNF_CELLS = {A3, A6}` — confirmed non-failures by experimenter. A3 has anomalously low initial capacity (~3800 mAh vs fleet ~4050 mAh), causing a false 80%-threshold EOL detection at cycle 216.
 
-A6 did not reach 80% capacity fade within its recorded lifetime.
+| Cell | Initial Cap | EoL index | RUL_max | Notes |
+|------|------------|-----------|---------|-------|
+| A1 | 4060 mAh | 174 | 348 | EOL cell |
+| A2 | 4060 mAh | 168 | 336 | EOL cell |
+| A3 | 3800 mAh | — | — | **DNF** — anomalous low initial cap |
+| A4 | 4030 mAh | 140 | 280 | EOL cell |
+| A5 | 3860 mAh | 116 | 232 | EOL cell |
+| A6 | 4050 mAh | — | — | **DNF** — no failure within recorded lifetime |
+| A7 | 4040 mAh | 95 | 190 | EOL cell (shortest life) |
+| A8 | 4040 mAh | 224 | 448 | EOL cell (longest life) |
 
-### Results
+### LOOCV Results
 
-| Model | A5 | A6 | A7 | A8 |
-|---|---|---|---|---|
-| Capacity GPR (RBF l=30, joint norm) | **0.97** | **0.79** | **0.99** | **0.95** |
-| RUL GPR (Linear, train norm) | 0.68 | DNF | −0.75 | 0.74 |
+All models evaluated under Leave-One-Out Cross-Validation (hold out 1 cell, train on remaining 7 or 5).
 
-**Capacity**: Excellent across all 4 test cells. Joint normalisation (same fix as paper's Fig 1a) removes cell-to-cell impedance offset.
+**Capacity (all 8 cells, fixed RBF l=30, joint normalisation):**
 
-**RUL A7 fails (R²=−0.75)**: A7 reaches EoL at cycle 95, earlier than all training cells (140–216). The model extrapolates outside its training range — same root cause as 25C08 in the paper.
+| Cell | A1 | A2 | A3 | A4 | A5 | A6 | A7 | A8 | Mean |
+|------|----|----|----|----|----|----|----|----|------|
+| R²   | 0.987 | 0.983 | 0.967 | 0.959 | 0.991 | 0.867 | 0.995 | 0.964 | **0.964** |
 
-### ARD: dominant frequencies for high C-rate cells
+Joint normalisation (pooling train+test per fold) removes cell-to-cell impedance offset. Strong generalisation across all 8 cells including both DNF cells.
 
-| Rank | Feature | Part | Frequency | Weight |
-|------|---------|------|-----------|--------|
-| 1 | #5 | Re(Z) | 7835 Hz | 0.436 |
-| 2 | #109 | Im(Z) | 0.26 Hz | 0.424 |
-| 3 | #91 | Im(Z) | **17.80 Hz** | 0.133 |
+**RUL (6 EOL cells, linear kernel, training-only normalisation):**
 
-Unlike the paper's 1C cells (where #91 dominates), high C-rate cycling shifts dominance to high-frequency ohmic resistance (#5, 7835 Hz) and very low-frequency diffusion (#109, 0.26 Hz). This is physically consistent: lithium plating and electrolyte degradation (high C-rate mechanisms) show up at high frequencies, while diffusion limitation appears at very low frequencies. The SEI feature (#91, 17.80 Hz) is still third-ranked, confirming it contributes to degradation at all C-rates.
+| Cell | A1 | A2 | A4 | A5 | A7 | A8 | Mean |
+|------|----|----|----|----|----|----|------|
+| Linear R² | −0.52 | −0.56 | −0.00 | −0.38 | 0.17 | −0.68 | **−0.33** |
+| RBF R²    | −0.57 | −0.68 | −0.00 | −2.09 | −5.27 | −0.09 | **−1.24** |
+
+RUL fails completely regardless of kernel. All mean R² values are below zero — worse than predicting the mean RUL.
+
+### Why RUL fails — root cause
+
+All A1-A8 cells operate at the same temperature, C-rate, and conditions. Their total lifetimes span only **190–448 cycles (2.4× spread)**. Because every cell degrades through the same mechanism, EIS trajectories look nearly identical regardless of how long the cell will actually live. There is no EIS fingerprint distinguishing a 190-cycle cell from a 448-cycle cell.
+
+We also applied LOOCV to the Cambridge dataset (Zhang et al.): R²=0.75 collapses to **mean R²=−10.4** under LOOCV. The paper's result depended on a train/test split where all test cell lifetimes fell inside the training range — an interpolation result, not genuine generalisation. The DOE was likely designed intentionally this way (calibration fleet bracketing the expected lifetime range).
+
+**For EIS → RUL to work**: training cells must have diverse lifetimes driven by physically distinguishable conditions. Temperature variation is the strongest lever — higher temperature simultaneously shifts EIS (Arrhenius) and accelerates degradation, creating a genuine learnable link between EIS signature and remaining life.
+
+### Frequency subset analysis
+
+LOOCV was run on three frequency sub-bands to test whether specific spectral regions drive prediction:
+
+| Band | Freq range | Cap R² | RUL R² |
+|------|-----------|--------|--------|
+| Full spectrum | 1–10 000 Hz | **0.964** | **−0.33** |
+| High | 500–10 000 Hz (11 pts) | 0.905 | −2.15 |
+| Mid | 10–500 Hz (14 pts) | 0.867 | −1.79 |
+| Low | 1–10 Hz (8 pts) | 0.872 | −2.07 |
+
+Capacity is encoded redundantly — any single band works reasonably. RUL fails equally across all bands, confirming the failure is not a frequency-coverage problem.
+
+### Coupled ARD
+
+The standard decoupled ARD (66 length-scales, Re and Im independent) is physically ambiguous because Kramers-Kronig relations couple Re(Z) and Im(Z) at every frequency. A coupled ARD kernel was implemented with one length-scale per physical frequency (33 total), shared across Re and Im. Capacity LOOCV R² is comparable between the two; the coupled representation gives physically interpretable importance scores.
 
 ### Scripts
 
 ```bash
-python preprocess_new_dataset.py   # extract Ns=6 EIS + capacity from Battery data.zip
-python run_new_dataset.py          # train A1-A4, test A5-A8, generate figures
+python preprocess_new_dataset.py    # extract Ns=6 EIS + capacity from Battery data.zip
+python run_new_dataset.py           # single train/test run, generate figures
+python run_loocv.py                 # LOOCV: capacity (8 cells) + RUL (6 EOL cells)
+python run_coupled_ard_loocv.py     # coupled vs decoupled ARD comparison
+python run_freq_subset_loocv.py     # LOOCV by frequency sub-band
+python plot_rez_vs_cycle.py         # Re(Z) trend for A1-A8
+python plot_rez_cambridge.py        # Re(Z) trend for Cambridge cells
 ```
 
 ---
