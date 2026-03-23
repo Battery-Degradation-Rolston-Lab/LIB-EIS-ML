@@ -1,6 +1,7 @@
 # Python
 __pycache__/
 *.py[cod]
+*.pyo
 *.egg-info/
 .venv/
 venv/
@@ -9,9 +10,30 @@ env/
 # Jupyter
 .ipynb_checkpoints/
 
-# OS
+# Raw data — large Zenodo files (not tracked; reproduce via preprocess scripts)
+raw_data/zenodo_eis/
+raw_data/zenodo_capacity/
+raw_data/Battery data.zip
+
+# OS artifacts
 .DS_Store
 Thumbs.db
+desktop.ini
+__MACOSX/
 
-# Large raw data (Zenodo source files are too large for git)
-# Preprocessed data (data/) is included — it's all <10 MB
+# Editor
+.vscode/
+*.swp
+
+# Claude internal memory/config
+.claude/
+
+# Office temp files
+~$*
+
+# PowerPoint and presentation artefacts
+*.pptx
+make_ppt.py
+add_paper2_slides.py
+add_speaker_notes.py
+paper_text.txt
