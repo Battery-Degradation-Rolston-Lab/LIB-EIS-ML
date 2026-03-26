@@ -1,13 +1,21 @@
 """
-Leave-One-Out Cross-Validation (LOOCV) for A1-A8 battery dataset.
+Leave-One-Out Cross-Validation (LOOCV) for CA1-CA8 battery dataset.
+
+CA1-CA8 are the COMPLETE runs of the same physical batteries as A1-A8.
+The A dataset (Battery data.zip) was an early partial export (cycles 0-267);
+the CA dataset (.mpt files) continues to near-zero capacity (470+ cycles).
+
+RUL factor: 1  (EIS measured every battery cycle, confirmed from cycle number alignment)
+            A1-A8 used factor=2 in error — CA data corrects this.
 
 Capacity GPR : all 8 cells, fixed RBF l=30, joint normalisation
-RUL GPR      : 6 EOL cells (A1, A2, A4, A5, A7, A8)
+RUL GPR      : 7 EOL cells (CA1-CA5, CA7, CA8)  — CA3 included (genuine failure)
+               CA6 excluded (DNF — never reached 80% threshold)
                - Paper method : Linear (DotProduct) kernel  — faithful to Zhang et al.
-               - Extended     : RBF kernel                  — our adaptation for high C-rate
+               - Extended     : RBF kernel                  — our adaptation
 
 LOOCV gives an honest, unbiased performance estimate:
-  train on 7 cells (or 5 for RUL), test on the held-out cell, rotate.
+  train on 7 cells (or 6 for RUL), test on the held-out cell, rotate.
 No cell is ever in both train and test simultaneously.
 """
 
@@ -22,7 +30,7 @@ from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF, WhiteKernel, DotProduct, ConstantKernel
 from sklearn.metrics import r2_score
 
-DATA = Path(__file__).parent / "data" / "new_dataset"
+DATA = Path(__file__).parent / "data" / "ca_dataset"
 OUT  = Path(__file__).parent / "output" / "new_dataset"
 OUT.mkdir(parents=True, exist_ok=True)
 
@@ -43,9 +51,9 @@ def apply_norm(X, mu, sig):
 # ---------------------------------------------------------------------------
 # Load all cell data
 # ---------------------------------------------------------------------------
-ALL_CELLS = [f'A{i}' for i in range(1, 9)]
-DNF_CELLS = {'A3', 'A6'}                          # confirmed no EOL
-EOL_CELLS = [c for c in ALL_CELLS if c not in DNF_CELLS]  # 6 cells
+ALL_CELLS = [f'CA{i}' for i in range(1, 9)]
+DNF_CELLS = {'CA6'}                               # never reached 80% threshold
+EOL_CELLS = [c for c in ALL_CELLS if c not in DNF_CELLS]  # 7 cells (CA3 included)
 
 print('Loading per-cell data ...')
 cell_eis    = {c: np.loadtxt(DATA / f'EIS_{c}.txt') for c in ALL_CELLS}
@@ -107,7 +115,7 @@ print(f'  Mean R² (all 8): {mean_cap:.4f}')
 # Plot — capacity LOOCV scatter per cell
 fig, axes = plt.subplots(2, 4, figsize=(16, 7))
 axes = axes.ravel()
-colors = {'A3': 'orange', 'A6': 'orange'}   # DNF cells highlighted
+colors = {'CA3': 'gold', 'CA6': 'orange'}    # CA3=low cap0 anomaly, CA6=DNF
 for idx, cell in enumerate(ALL_CELLS):
     ax = axes[idx]
     col = colors.get(cell, 'steelblue')
@@ -133,7 +141,7 @@ print(f'  Saved: fig_cap_loocv.png')
 # MODEL 2 — RUL LOOCV  (6 EOL cells)  — Linear vs RBF
 # ===========================================================================
 print('\n' + '='*60)
-print('MODEL 2 — RUL LOOCV  (6 EOL cells: linear vs RBF)')
+print('MODEL 2 — RUL LOOCV  (7 EOL cells: linear vs RBF)')
 print('='*60)
 
 r2_lin = {}; pred_lin = {}; meas_rul = {}
@@ -184,7 +192,7 @@ mean_rbf = np.mean(list(r2_rbf.values()))
 print(f'  Mean R²  —  Linear: {mean_lin:.4f}  |  RBF: {mean_rbf:.4f}')
 
 # Plot — RUL scatter: linear (top row) vs RBF (bottom row)
-fig, axes = plt.subplots(2, 6, figsize=(18, 7))
+fig, axes = plt.subplots(2, 7, figsize=(21, 7))
 for col_idx, cell in enumerate(EOL_CELLS):
     rul_max = int(meas_rul[cell][0])
 
@@ -230,7 +238,7 @@ bars_rbf = ax.bar(x + w/2, [r2_rbf[c] for c in EOL_CELLS], w,
 ax.axhline(0, color='black', lw=0.8)
 ax.set_xticks(x); ax.set_xticklabels(EOL_CELLS)
 ax.set_ylabel('R²')
-ax.set_title('RUL LOOCV — Linear vs RBF kernel  (6 EOL cells, train on 5 test on 1)')
+ax.set_title('RUL LOOCV — Linear vs RBF kernel  (7 EOL cells, train on 6 test on 1)')
 ax.legend()
 ax.grid(True, alpha=0.3, axis='y')
 plt.tight_layout()
@@ -284,6 +292,10 @@ for test_cell in ALL_CELLS:
     EIS_tr = np.vstack([cell_eis[c] for c in train_cells])
     Cap_tr = np.concatenate([cell_cap[c] for c in train_cells])
     EIS_te = cell_eis[test_cell]
+
+    # Subsample every 2nd cycle to keep ARD kernel matrix tractable in memory
+    EIS_tr = EIS_tr[::2]
+    Cap_tr = Cap_tr[::2]
 
     # Joint norm (same as capacity LOOCV)
     EIS_all = np.vstack([EIS_tr, EIS_te])

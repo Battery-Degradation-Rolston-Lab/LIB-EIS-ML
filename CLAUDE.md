@@ -39,25 +39,31 @@ python battery_gpytorch_rtx4060/battery_gpytorch/preprocess_new_dataset.py
 ```
 Downloads/
 ├── CLAUDE.md                           ← this file (keep short)
+├── README.md                           ← full experiment documentation
+├── reproducibility.md                  ← data compatibility checklist per experiment
 ├── agent_docs/                         ← load on demand, not at session start
 │   ├── science.md                      ← ARD findings, R² targets, interpretation
 │   ├── data.md                         ← data formats, preprocessing conventions
 │   └── models.md                       ← architectures, normalisation, kernel translation
 ├── tasks/
-│   ├── lessons.md                      ← mistake log (Claude appends after corrections)
-│   └── todo.md                         ← active task plan
+│   └── lessons.md                      ← mistake log (Claude appends after corrections)
 ├── battery_gpytorch_rtx4060/
 │   └── battery_gpytorch/
-│       ├── run_gpytorch.py             ← paper reproduction
-│       ├── run_new_dataset.py          ← A1-A8 analysis
-│       ├── run_loocv.py                ← LOOCV validation
-│       ├── preprocess_new_dataset.py   ← parse Battery data.zip
-│       ├── preprocess_zenodo.py        ← parse Zenodo EIS files
-│       ├── data/new_dataset/           ← preprocessed A1-A8 files
+│       ├── run_gpytorch.py             ← paper reproduction (Cambridge)
+│       ├── run_new_dataset.py          ← A1-A8 fixed train/test
+│       ├── run_loocv.py                ← CA1-CA8 LOOCV (complete lifecycle)
+│       ├── run_cap_rul.py              ← capacity-derived RUL (CA1-CA8)
+│       ├── run_freq_subset_loocv.py    ← frequency band LOOCV (A1-A8)
+│       ├── run_coupled_ard_loocv.py    ← coupled ARD (A1-A8)
+│       ├── preprocess_new_dataset.py   ← parse Battery data.zip → A1-A8
+│       ├── preprocess_ca_dataset.py    ← parse Battery data/ .mpt → CA1-CA8
+│       ├── preprocess_zenodo.py        ← parse Zenodo EIS files → Cambridge
+│       ├── data/new_dataset/           ← preprocessed A1-A8 (66 features)
+│       ├── data/ca_dataset/            ← preprocessed CA1-CA8 (66 features)
 │       └── output/new_dataset/         ← generated figures
-├── Battery data.zip                    ← raw A1-A8 dataset
-├── EIS data/                           ← Zenodo raw EIS files
-└── Capacity data/                      ← Zenodo raw capacity files
+├── Battery data/                       ← raw CA1-CA8 complete lifecycle (.mpt)
+├── raw_data/Battery data.zip           ← raw A1-A8 partial export
+└── raw_data/zenodo_eis|capacity/       ← Zenodo raw Cambridge files
 ```
 
 ---

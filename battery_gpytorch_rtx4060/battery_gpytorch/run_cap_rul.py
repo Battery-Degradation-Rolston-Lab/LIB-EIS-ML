@@ -29,7 +29,7 @@ from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF, WhiteKernel, ConstantKernel
 from sklearn.metrics import r2_score
 
-DATA = Path(__file__).parent / "data" / "new_dataset"
+DATA = Path(__file__).parent / "data" / "ca_dataset"
 OUT  = Path(__file__).parent / "output" / "new_dataset"
 OUT.mkdir(parents=True, exist_ok=True)
 
@@ -86,8 +86,8 @@ def predict_eol(cycles, cap_pred, eol_threshold):
 # ---------------------------------------------------------------------------
 # Load all cell data
 # ---------------------------------------------------------------------------
-ALL_CELLS = [f'A{i}' for i in range(1, 9)]
-DNF_CELLS = {'A3', 'A6'}
+ALL_CELLS = [f'CA{i}' for i in range(1, 9)]
+DNF_CELLS = {'CA6'}
 EOL_CELLS = [c for c in ALL_CELLS if c not in DNF_CELLS]
 
 print('Loading per-cell data ...')
