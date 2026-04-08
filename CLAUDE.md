@@ -16,20 +16,32 @@ spectrum in, ARD identifies which frequencies matter.
 ## Essential Commands
 
 ```bash
-# Python env
-battery_gpytorch_rtx4060\.venv\Scripts\python.exe
+# Python env (activate first)
+source battery_gpytorch_rtx4060/.venv/Scripts/activate
 
-# Paper reproduction (Zhang et al. Figs 3, 4)
+# Paper reproduction (Zhang et al. Figs 1–4)
 python battery_gpytorch_rtx4060/battery_gpytorch/run_gpytorch.py
 
-# New A1-A8 dataset
+# New A1-A8 dataset (fixed train/test)
 python battery_gpytorch_rtx4060/battery_gpytorch/run_new_dataset.py
 
-# LOOCV validation
+# CA1-CA8 LOOCV (complete lifecycle)
 python battery_gpytorch_rtx4060/battery_gpytorch/run_loocv.py
 
-# Preprocess new dataset from zip
+# Capacity-derived RUL (CA1-CA8)
+python battery_gpytorch_rtx4060/battery_gpytorch/run_cap_rul.py
+
+# Multi-temp CB dataset (capacity + RUL)
+python battery_gpytorch_rtx4060/battery_gpytorch/run_multitemp_approaches.py
+python battery_gpytorch_rtx4060/battery_gpytorch/run_multitemp_rul.py
+
+# Multi-temp replication on Zhang data
+python battery_gpytorch_rtx4060/battery_gpytorch/run_multitemp_zhang.py
+
+# Preprocess datasets
 python battery_gpytorch_rtx4060/battery_gpytorch/preprocess_new_dataset.py
+python battery_gpytorch_rtx4060/battery_gpytorch/preprocess_ca_dataset.py
+python battery_gpytorch_rtx4060/battery_gpytorch/preprocess_multitemp_dataset.py
 ```
 
 ---
@@ -37,7 +49,7 @@ python battery_gpytorch_rtx4060/battery_gpytorch/preprocess_new_dataset.py
 ## Repository Map
 
 ```
-Downloads/
+LIB-EIS-ML/
 ├── CLAUDE.md                           ← this file (keep short)
 ├── README.md                           ← full experiment documentation
 ├── reproducibility.md                  ← data compatibility checklist per experiment
@@ -47,6 +59,10 @@ Downloads/
 │   └── models.md                       ← architectures, normalisation, kernel translation
 ├── tasks/
 │   └── lessons.md                      ← mistake log (Claude appends after corrections)
+├── docs/
+│   └── paper_text.txt                  ← paper reference text
+├── presentation/                       ← slides + generation scripts (gitignored)
+├── reference/                          ← original MATLAB code, paper PDF, reference data
 ├── battery_gpytorch_rtx4060/
 │   └── battery_gpytorch/
 │       ├── run_gpytorch.py             ← paper reproduction (Cambridge)
@@ -55,14 +71,23 @@ Downloads/
 │       ├── run_cap_rul.py              ← capacity-derived RUL (CA1-CA8)
 │       ├── run_freq_subset_loocv.py    ← frequency band LOOCV (A1-A8)
 │       ├── run_coupled_ard_loocv.py    ← coupled ARD (A1-A8)
+│       ├── run_multitemp_approaches.py ← multi-temp CB dataset approaches
+│       ├── run_multitemp_rul.py        ← multi-temp CB dataset RUL
+│       ├── run_multitemp_zhang.py      ← multi-temp replication on Zhang data
 │       ├── preprocess_new_dataset.py   ← parse Battery data.zip → A1-A8
 │       ├── preprocess_ca_dataset.py    ← parse Battery data/ .mpt → CA1-CA8
+│       ├── preprocess_multitemp_dataset.py ← parse CB cells → multi-temp dataset
 │       ├── preprocess_zenodo.py        ← parse Zenodo EIS files → Cambridge
 │       ├── data/new_dataset/           ← preprocessed A1-A8 (66 features)
 │       ├── data/ca_dataset/            ← preprocessed CA1-CA8 (66 features)
-│       └── output/new_dataset/         ← generated figures
-├── Battery data/                       ← raw CA1-CA8 complete lifecycle (.mpt)
+│       ├── data/multitemp_dataset/     ← preprocessed CB multi-temp data
+│       ├── output/                     ← paper reproduction figures (fig1a–fig4c)
+│       ├── output/new_dataset/         ← A1-A8 and CA1-CA8 figures
+│       ├── output/multitemp/           ← CB multi-temp figures
+│       └── output/multitemp_zhang/     ← Zhang multi-temp figures
+├── Battery data/                       ← raw CA1-CA8 + CB complete lifecycle (.mpt)
 ├── raw_data/Battery data.zip           ← raw A1-A8 partial export
+├── raw_data/Code-Matlab.zip            ← original MATLAB code archive
 └── raw_data/zenodo_eis|capacity/       ← Zenodo raw Cambridge files
 ```
 
@@ -94,13 +119,16 @@ Downloads/
 
 | Model | Result | Notes |
 |-------|--------|-------|
-| Paper Fig 3a capacity | R²=0.83 (target 0.81) | Beat target |
-| Paper Fig 4b RUL | R²=0.75 (target 0.75) | Exact match |
+| Paper Fig 3a capacity (35°C) | R²=0.91 (target 0.81) | Beat target |
+| Paper Fig 4b RUL (35°C) | R²=0.85 (target 0.75) | Beat target |
 | A1-A8 Capacity LOOCV | mean R²=0.964 | Strong generalisation across all 8 cells |
-| A1-A8 RUL Linear LOOCV | mean R²=-0.33 | Absolute RUL doesn't transfer across cells |
-| A1-A8 RUL RBF LOOCV | mean R²=-1.24 | Worse than linear — overfits to training lifetimes |
-
-**Next**: capacity-derived RUL (use GPR capacity trajectory → extrapolate to 80% threshold)
+| A1-A8 RUL Linear LOOCV | mean R²=−0.33 | Absolute RUL doesn't transfer — expected |
+| CA1-CA8 Capacity LOOCV | run `run_loocv.py` | Complete lifecycle dataset |
+| CA1-CA8 Capacity-derived RUL | run `run_cap_rul.py` | Extrapolate trajectory to 80% |
+| CB Multi-temp Capacity (baseline) | N20_CB1-4 R²≈−8.7 | Train RT+-10°C only — -20°C out of distribution |
+| CB Multi-temp Capacity (Zhang DOE) | N10_CB4 R²=0.43 / N20_CB4 R²=0.94 | All temps in training — Zhang-faithful |
+| CB Multi-temp RUL (Zhang DOE) | N10_CB4 R²=0.16 / N20_CB4 R²=−157 | -20°C RUL range 0-17 vs RT 0-214 — scale mismatch |
+| CB Coupled ARD (Zhang DOE) | top: 1.33 Hz (w=0.64) + 1000 Hz (w=0.36) | 33 ls, Re+Im paired per frequency |
 
 ---
 

@@ -10,17 +10,23 @@ GPR on raw EIS spectra (no feature engineering) predicts battery capacity and RU
 ## Quick Start
 
 ```bash
-# Paper reproduction (Figs 1–4, Cambridge dataset)
+# Activate environment
+source battery_gpytorch_rtx4060/.venv/Scripts/activate
+
+# Experiment 1 — Paper reproduction (Figs 1–4, Cambridge/Zenodo dataset)
 python battery_gpytorch_rtx4060/battery_gpytorch/run_gpytorch.py
 
-# New in-house dataset — fixed A1-A4 train / A5-A8 test
+# Experiment 2 — In-house A1-A8 fixed train/test
 python battery_gpytorch_rtx4060/battery_gpytorch/run_new_dataset.py
 
-# LOOCV on complete CA1-CA8 lifecycle data
+# Experiment 3 — CA1-CA8 LOOCV (complete lifecycle)
 python battery_gpytorch_rtx4060/battery_gpytorch/run_loocv.py
-
-# Capacity-derived RUL via trajectory extrapolation (CA1-CA8)
 python battery_gpytorch_rtx4060/battery_gpytorch/run_cap_rul.py
+
+# Experiment 4 — Multi-temperature CB dataset (−10°C / −20°C)
+python battery_gpytorch_rtx4060/battery_gpytorch/run_multitemp_approaches.py
+python battery_gpytorch_rtx4060/battery_gpytorch/run_multitemp_rul.py
+python battery_gpytorch_rtx4060/battery_gpytorch/run_multitemp_zhang.py
 ```
 
 ---
