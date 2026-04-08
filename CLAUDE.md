@@ -128,7 +128,11 @@ LIB-EIS-ML/
 | A1-A8 Capacity LOOCV | mean R²=0.964 | Strong generalisation across all 8 cells |
 | A1-A8 RUL Linear LOOCV | mean R²=−0.33 | Absolute RUL doesn't transfer — expected |
 | CA1-CA8 Capacity LOOCV | run `run_loocv.py` | Complete lifecycle dataset |
-| CA1-CA8 Capacity-derived RUL | run `run_cap_rul.py` | Extrapolate trajectory to 80% |
+| RT Cap-derived RUL (LOOCV) | mean R²=0.893 (7 EOL cells) | Best RT RUL approach — `run_cap_rul.py` |
+| −10°C Cap-derived RUL (DOE) | R²=−0.82 (N10_CB4) | Fails — cap model too weak (R²=0.68) |
+| −20°C Cap-derived RUL (DOE) | R²=0.970 (N20_CB4) | Excellent — pred EOL=16.1 vs actual 17 |
+| −10°C Cap-derived RUL (LOOCV) | mean R²=−0.23 | High cell variability (EOL 71–114) |
+| −20°C Cap-derived RUL (LOOCV) | mean R²=0.658 | CB3/CB4 excellent, CB1/CB2 weaker |
 | CB Multi-temp Capacity (baseline) | N20_CB1-4 R²≈−8.7 | Train RT+-10°C only — -20°C out of distribution |
 | CB Multi-temp Capacity (Zhang DOE) | N10_CB4 R²=0.375 / N20_CB4 R²=0.949 | All temps in training — Zhang-faithful |
 | CB Multi-temp RUL (Zhang DOE) | N10_CB4 R²=0.226 / N20_CB4 R²=−120 | -20°C RUL range 0-17 vs RT 0-214 — scale mismatch |

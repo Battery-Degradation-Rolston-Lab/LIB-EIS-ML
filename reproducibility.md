@@ -220,6 +220,7 @@ Completed scorecards for our three datasets.
 | Frequency subset LOOCV | ✅ | 0.87–0.96 by band | Capacity encoded redundantly across spectrum |
 | Coupled ARD LOOCV | ✅ | comparable to decoupled | Physically interpretable importance scores |
 | Capacity-derived RUL | ✅ | see `fig_cap_rul_scatter.png` | Uses capacity GPR → extrapolate to 80% threshold |
+| **Cap-derived RUL (CA1-CA8 LOOCV)** | ✅ | **0.893** (mean, 7 EOL) | `run_cap_rul.py` — best RUL approach for single-T |
 
 **Key insight:** Step 4.2 immediately flags this dataset (single-T → skip direct RUL). Capacity LOOCV succeeds because joint normalisation removes inter-cell impedance offset.
 
@@ -312,7 +313,23 @@ Used with CA1-CA8 (RT) to form a 3-temperature DOE following Zhang's approach.
 | Direct RUL (N10_CB1–3 → N10_CB4) | −10°C | ✅ | **0.734** | Works — temperature shortens life monotonically within group |
 | Direct RUL (N20_CB1–3 → N20_CB4) | −20°C | ⚠️ | 0.459 | Short RUL range (15–21 cycles) limits prediction quality |
 
-**Key insight:** Capacity prediction follows Zhang exactly once representative cells from every temperature are in training. RUL fails for −20°C because colder temperatures drastically shorten cell life (17–21 cycles), creating an out-of-distribution RUL range relative to RT training cells. **Fix: fractional RUL (normalise each cell's RUL by its own RUL_max before training).**
+### Step 7 — Scorecard (Capacity-derived RUL: `run_cap_rul.py`)
+| Experiment | Temperature | Compatible? | R² | Notes |
+|-----------|-------------|-------------|-----|-------|
+| Cap-derived RUL (LOOCV, 8-fold) | RT (25°C) | ✅ | **0.893** (mean, 7 EOL) | Best RT RUL approach; fixed RBF l=30, joint norm |
+| Cap-derived RUL (DOE, N10_CB4) | −10°C | ❌ | −0.82 | Cap model R²=0.68 → extrapolation overshoots (pred EOL=114 vs actual 82) |
+| Cap-derived RUL (LOOCV, 4-fold) | −10°C | ❌ | −0.23 (mean) | CB1 good (0.90), CB2/CB3 fail — high EOL spread (71–114) |
+| Cap-derived RUL (DOE, N20_CB4) | −20°C | ✅ | **0.970** | Excellent; pred EOL=16.1 vs actual 17 |
+| Cap-derived RUL (LOOCV, 4-fold) | −20°C | ✅ | 0.658 (mean) | CB3=0.98, CB4=0.97, CB1/CB2 weaker |
+
+### Best RUL Approach Per Temperature
+| Temperature | Best method | R² | Why |
+|-------------|------------|-----|-----|
+| RT (25°C) | Cap-derived (LOOCV) | **0.893** | Smooth capacity curves → accurate extrapolation |
+| −10°C | Direct EIS→RUL (linear) | **0.734** | Single dominant frequency (13.3 Hz); capacity model too weak for extrapolation |
+| −20°C | Cap-derived (DOE) | **0.970** | Steep monotonic degradation → clean EOL extrapolation |
+
+**Key insight:** No single RUL approach works at all temperatures. The optimal strategy depends on the degradation regime: capacity-derived RUL works when the capacity model is accurate (RT, −20°C); direct EIS→RUL works at −10°C where a single dominant frequency creates a learnable signal. The same cells, same chemistry — success or failure is determined by whether the degradation physics creates a unique EIS→RUL mapping.
 
 ---
 
@@ -327,6 +344,7 @@ Used with CA1-CA8 (RT) to form a 3-temperature DOE following Zhang's approach.
 | Capacity (train/test) | 0.91 / 0.94 | — | — | N10: 0.375 / N20: **0.949** | RT: 0.996 / −10°C: 0.676 / −20°C: **0.937** |
 | Capacity LOOCV R² | N/A | **0.964** | see output | not done | not done (LOOCV separate) |
 | Direct RUL works? | ✅ (multi-T, warm) | ❌ | ❌ | ⚠️ (scale mismatch cold) | RT ❌ / −10°C ✅ 0.734 / −20°C ⚠️ 0.459 |
-| Cap-derived RUL | not needed | ✅ | ✅ | under investigation | not done |
+| Cap-derived RUL | not needed | ✅ | ✅ | under investigation | RT ✅ 0.893 / −10°C ❌ / −20°C ✅ 0.970 |
+| **Best RUL** | Direct (multi-T) | Cap-derived | Cap-derived | — | RT: cap-derived / −10°C: direct / −20°C: cap-derived |
 | Script | `run_gpytorch.py` | `run_new_dataset.py` | `run_loocv.py` | `run_multitemp_zhang.py` | `run_ca_zhang.py` |
 | Data public? | Partially (GitHub + Zenodo) | 🔒 in-house | 🔒 in-house | 🔒 in-house | 🔒 in-house |
