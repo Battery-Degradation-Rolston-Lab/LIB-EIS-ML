@@ -263,15 +263,59 @@ Completed scorecards for our three datasets.
 
 ---
 
+## Record: CB Multi-Temperature Dataset (N10/N20 CB cells)
+
+**Cells:** N10_CB1–CB4 (−10°C), N20_CB1–CB4 (−20°C) | **Features:** 66 (33 freqs × Re + Im) | **EIS cadence:** every cycle | **Source:** `21700 Molicell Cycling Data.zip`
+
+Used with CA1-CA8 (RT) to form a 3-temperature DOE following Zhang's approach.
+
+### Step 1 — Format
+| Check | Result |
+|-------|--------|
+| Re(Z) + Im(Z) available | ✅ |
+| Consistent frequency grid | ✅ 33 native frequencies (Ns=6, same as CA dataset) |
+| Frequency range | 1 Hz – 10 kHz |
+| Sub-1 Hz | ❌ None |
+| Discharge capacity per cycle | ✅ |
+| EIS–capacity alignment | ✅ Ns=6 (PEIS) + Ns=8 (CC discharge) on same cycle |
+| EIS state | Ns=6 after full charge |
+
+### Step 2 — Characteristics
+| Check | Value |
+|-------|-------|
+| N_cells | 8 (4 at −10°C + 4 at −20°C) |
+| Cycles per cell | N10: 142–148, N20: 104–137 |
+| EIS cadence | Every cycle (RUL factor = 1) |
+| N_eol | 8 (all cells reached EOL) |
+| N_dnf | 0 |
+| Anomalous initial cap | None confirmed |
+| RUL_max spread | N10: 72–115, N20: **15–21** (very short at −20°C) |
+| Temperature DOE | **Multi-T: −10°C and −20°C** (paired with RT CA cells) |
+| Higher-T = shorter life | ✅ Yes (colder = shorter: N20 < N10 < RT) |
+
+### Step 7 — Scorecard (Zhang DOE: train all temps, hold out 1 per temp)
+| Experiment | Compatible? | R² | Notes |
+|-----------|-------------|-----|-------|
+| Capacity (Zhang DOE, N10_CB4) | ⚠️ | 0.43 | Below expectation — needs more optimizer restarts |
+| Capacity (Zhang DOE, N20_CB4) | ✅ | **0.94** | Zhang DOE works: −20°C in training |
+| Direct RUL (N10_CB4) | ⚠️ | 0.16 | Marginal — short −10°C RUL range |
+| Direct RUL (N20_CB4) | ❌ | −157 | RUL range 0-17 vs RT 0-214: massive scale mismatch |
+| Coupled ARD | ✅ | — | 1.33 Hz (w=0.64) + 1000 Hz (w=0.36) — sharp 2-frequency signature |
+
+**Key insight:** Capacity prediction follows Zhang exactly once representative cells from every temperature are in training. RUL fails for −20°C because colder temperatures drastically shorten cell life (17–21 cycles), creating an out-of-distribution RUL range relative to RT training cells. **Fix: fractional RUL (normalise each cell's RUL by its own RUL_max before training).**
+
+---
+
 ## Quick Comparison Across Datasets
 
-| Property | Cambridge | A1-A8 | CA1-CA8 |
-|----------|-----------|-------|---------|
-| N cells | 12 | 8 | 8 |
-| Features | 120 | 66 | 66 |
-| Temperature DOE | Multi-T | Single-T | Single-T |
-| EIS cadence | every 2 cycles | every 2 cycles | every cycle |
-| Capacity LOOCV R² | N/A (train/test split) | **0.964** | see output |
-| Direct RUL works? | ✅ (multi-T) | ❌ | ❌ |
-| Cap-derived RUL | not needed | ✅ | ✅ |
-| Data public? | Partially (GitHub + Zenodo) | 🔒 in-house | 🔒 in-house |
+| Property | Cambridge | A1-A8 | CA1-CA8 | CB Multi-T |
+|----------|-----------|-------|---------|------------|
+| N cells | 12 | 8 | 8 | 8 (+ 8 RT CA cells) |
+| Features | 120 | 66 | 66 | 66 |
+| Temperature DOE | Multi-T (25/35/45°C) | Single-T | Single-T | Multi-T (RT/−10/−20°C) |
+| EIS cadence | every 2 cycles | every 2 cycles | every cycle | every cycle |
+| Capacity (train/test split) | 0.91 / 0.94 | — | — | N10: 0.43 / N20: **0.94** |
+| Capacity LOOCV R² | N/A | **0.964** | see output | not done |
+| Direct RUL works? | ✅ (multi-T, warm cells) | ❌ | ❌ | ⚠️ (scale mismatch for cold cells) |
+| Cap-derived RUL | not needed | ✅ | ✅ | under investigation |
+| Data public? | Partially (GitHub + Zenodo) | 🔒 in-house | 🔒 in-house | 🔒 in-house |

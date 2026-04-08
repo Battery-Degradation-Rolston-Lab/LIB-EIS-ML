@@ -169,6 +169,43 @@ Results: see `fig_cap_rul_trajectories.png` and `fig_cap_rul_scatter.png`.
 
 ---
 
+## Experiment 5 — Multi-Temperature CB Dataset (Zhang DOE + Coupled ARD)
+
+**Script:** `run_multitemp_zhang.py` | **Data:** `data/multitemp_dataset/` | **Features:** 66
+
+8 Molicell 21700 P42A NMC cells cycled at −10°C (N10_CB1–CB4) and −20°C (N20_CB1–CB4). All cells reached EOL. EIS every cycle (Ns=6, post-charge, 33 freqs). Combined with RT cells (CA1-CA8) to form a 3-temperature DOE.
+
+### Zhang DOE split
+
+| Set | Cells |
+|-----|-------|
+| Train | CA1-CA8 (RT) + N10_CB1-CB3 (−10°C) + N20_CB1-CB3 (−20°C) |
+| Test | N10_CB4 (−10°C held-out) + N20_CB4 (−20°C held-out) |
+
+Kernel: **CoupledARD-RBF** (33 ls, Re+Im paired per frequency) for capacity; **Linear** for RUL.
+
+### Results
+
+| Task | Cell | R² |
+|------|------|----|
+| Capacity | N10_CB4 (−10°C) | 0.43 |
+| Capacity | N20_CB4 (−20°C) | **0.94** |
+| RUL | N10_CB4 (−10°C) | 0.16 |
+| RUL | N20_CB4 (−20°C) | −157 |
+
+**Coupled ARD:** 1.33 Hz (w=0.64) and 1000 Hz (w=0.36) — only 2 of 33 frequencies matter.
+
+**−20°C capacity succeeds** because the Zhang DOE includes representative cells at every test temperature in training. **−20°C RUL fails** because −20°C cells live only 17–21 cycles vs RT 200+ — the linear model trained on RT-scale RUL cannot resolve this range. Fix: fractional RUL normalised by each cell's own RUL_max.
+
+### Comparison: Baseline vs Zhang DOE (−20°C test cells)
+
+| Approach | Mean Cap R² | Mean RUL R² |
+|----------|-------------|-------------|
+| Baseline (train RT+−10°C only) | −8.7 | −6499 |
+| **Zhang DOE (all temps in training)** | **0.94** | −157 |
+
+---
+
 ## Why Direct EIS → RUL Fails
 
 All A1-A8 / CA1-CA8 cells operate at the same temperature, C-rate, and conditions. Total lifetimes span **190–448 cycles (2.4× range)**. Two cells at identical State of Health (same EIS signature) can have completely different remaining lives depending on their intrinsic total lifespan — which EIS cannot encode.
@@ -202,10 +239,12 @@ Feature #100 (2.16 Hz) appears at 25°C only — it is sensitive to both tempera
 | `run_cap_rul.py` | CA1-CA8 | Capacity-derived RUL via extrapolation | `fig_cap_rul_trajectories`, `fig_cap_rul_scatter` |
 | `run_freq_subset_loocv.py` | A1-A8 | Frequency band LOOCV | `fig_freq_subset_cap_heatmap`, `fig_freq_subset_rul_heatmap` |
 | `run_coupled_ard_loocv.py` | A1-A8 | Coupled vs decoupled ARD | `fig_ARD_coupled_vs_decoupled` |
-| `plot_rez_vs_cycle.py` | A1-A8 | Re(Z) bulk resistance vs cycle | `fig_ReZ_vs_cycle` |
-| `plot_rez_cambridge.py` | Cambridge | Re(Z) bulk resistance vs cycle | `fig_ReZ_cambridge` |
+| `run_multitemp_zhang.py` | CA+CB multi-T | **Zhang DOE + Coupled ARD** (RT+−10°C+−20°C train, 1 held-out per temp) | `output/multitemp_zhang/` |
+| `run_multitemp_rul.py` | CA+CB multi-T | Baseline multi-T RUL (train RT+−10°C, test −20°C) + decoupled ARD | `output/multitemp/` |
+| `run_multitemp_approaches.py` | CA+CB multi-T | LOOCV multi-T and relative-feature normalisation approaches | `output/multitemp/` |
 | `preprocess_new_dataset.py` | Battery data.zip | Extract A1-A8 EIS + capacity | `data/new_dataset/` |
 | `preprocess_ca_dataset.py` | Battery data/ (.mpt) | Extract CA1-CA8 EIS + capacity | `data/ca_dataset/` |
+| `preprocess_multitemp_dataset.py` | 21700 Molicell Cycling Data.zip | Extract N10/N20 CB cells | `data/multitemp_dataset/` |
 | `preprocess_zenodo.py` | Zenodo raw files | Extract Cambridge EIS + capacity | `data/*.txt` |
 
 ---
