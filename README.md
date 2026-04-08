@@ -188,12 +188,12 @@ Kernel: **CoupledARD-RBF** (33 ls, Re+Im paired per frequency) for capacity; **L
 
 | Task | Cell | R² |
 |------|------|----|
-| Capacity | N10_CB4 (−10°C) | 0.43 |
-| Capacity | N20_CB4 (−20°C) | **0.94** |
-| RUL | N10_CB4 (−10°C) | 0.16 |
-| RUL | N20_CB4 (−20°C) | −157 |
+| Capacity | N10_CB4 (−10°C) | 0.375 |
+| Capacity | N20_CB4 (−20°C) | **0.949** |
+| RUL | N10_CB4 (−10°C) | 0.226 |
+| RUL | N20_CB4 (−20°C) | −120 |
 
-**Coupled ARD:** 1.33 Hz (w=0.64) and 1000 Hz (w=0.36) — only 2 of 33 frequencies matter.
+**Coupled ARD:** 1.33 Hz (w=0.71) dominant, secondary peak ~30–50 Hz (w~0.3). Low-frequency diffusion/charge-transfer signal drives capacity prediction.
 
 **−20°C capacity succeeds** because the Zhang DOE includes representative cells at every test temperature in training. **−20°C RUL fails** because −20°C cells live only 17–21 cycles vs RT 200+ — the linear model trained on RT-scale RUL cannot resolve this range. Fix: fractional RUL normalised by each cell's own RUL_max.
 
@@ -202,7 +202,7 @@ Kernel: **CoupledARD-RBF** (33 ls, Re+Im paired per frequency) for capacity; **L
 | Approach | Mean Cap R² | Mean RUL R² |
 |----------|-------------|-------------|
 | Baseline (train RT+−10°C only) | −8.7 | −6499 |
-| **Zhang DOE (all temps in training)** | **0.94** | −157 |
+| **Zhang DOE (all temps in training)** | **0.949** | −120 |
 
 ---
 

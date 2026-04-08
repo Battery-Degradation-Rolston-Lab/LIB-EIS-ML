@@ -126,9 +126,9 @@ LIB-EIS-ML/
 | CA1-CA8 Capacity LOOCV | run `run_loocv.py` | Complete lifecycle dataset |
 | CA1-CA8 Capacity-derived RUL | run `run_cap_rul.py` | Extrapolate trajectory to 80% |
 | CB Multi-temp Capacity (baseline) | N20_CB1-4 R²≈−8.7 | Train RT+-10°C only — -20°C out of distribution |
-| CB Multi-temp Capacity (Zhang DOE) | N10_CB4 R²=0.43 / N20_CB4 R²=0.94 | All temps in training — Zhang-faithful |
-| CB Multi-temp RUL (Zhang DOE) | N10_CB4 R²=0.16 / N20_CB4 R²=−157 | -20°C RUL range 0-17 vs RT 0-214 — scale mismatch |
-| CB Coupled ARD (Zhang DOE) | top: 1.33 Hz (w=0.64) + 1000 Hz (w=0.36) | 33 ls, Re+Im paired per frequency |
+| CB Multi-temp Capacity (Zhang DOE) | N10_CB4 R²=0.375 / N20_CB4 R²=0.949 | All temps in training — Zhang-faithful |
+| CB Multi-temp RUL (Zhang DOE) | N10_CB4 R²=0.226 / N20_CB4 R²=−120 | -20°C RUL range 0-17 vs RT 0-214 — scale mismatch |
+| CB Coupled ARD (Zhang DOE) | top: 1.33 Hz (w=0.71) | 33 ls, Re+Im paired per frequency |
 
 ---
 
