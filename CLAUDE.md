@@ -127,7 +127,7 @@ LIB-EIS-ML/
 | Paper Fig 4b RUL (35°C) | R²=0.85 (target 0.75) | Beat target |
 | A1-A8 Capacity LOOCV | mean R²=0.964 | Strong generalisation across all 8 cells |
 | A1-A8 RUL Linear LOOCV | mean R²=−0.33 | Absolute RUL doesn't transfer — expected |
-| CA1-CA8 Capacity LOOCV | run `run_loocv.py` | Complete lifecycle dataset |
+| CA1-CA8 Capacity LOOCV | mean R²=0.934 | Joint norm, fixed RBF l=30 — `run_loocv.py` |
 | RT Cap-derived RUL (LOOCV) | mean R²=0.893 (7 EOL cells) | Best RT RUL approach — `run_cap_rul.py` |
 | −10°C Cap-derived RUL (DOE) | R²=−0.82 (N10_CB4) | Fails — cap model too weak (R²=0.68) |
 | −20°C Cap-derived RUL (DOE) | R²=0.970 (N20_CB4) | Excellent — pred EOL=16.1 vs actual 17 |
