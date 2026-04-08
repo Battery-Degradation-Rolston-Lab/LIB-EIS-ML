@@ -145,27 +145,34 @@ CA1-CA8 are the complete runs of the same physical batteries. EIS measured every
 
 | Cell | CA1 | CA2 | CA3 | CA4 | CA5 | CA6 | CA7 | CA8 | Mean |
 |------|-----|-----|-----|-----|-----|-----|-----|-----|------|
-| R²   | — | — | — | — | — | — | — | — | see `fig_cap_loocv.png` |
+| R²   | 0.995 | 0.993 | 0.995 | 0.987 | 0.971 | 0.562 | 0.991 | 0.982 | **0.934** |
 
 ### RUL LOOCV — 7 EOL cells (CA1–CA5, CA7, CA8)
 
 | Cell | CA1 | CA2 | CA3 | CA4 | CA5 | CA7 | CA8 | Mean |
 |------|-----|-----|-----|-----|-----|-----|-----|------|
-| Linear R² | — | — | — | — | — | — | — | see `fig_rul_loocv.png` |
-| RBF R²    | — | — | — | — | — | — | — | see `fig_rul_loocv_comparison.png` |
+| Linear R² | 0.141 | 0.154 | 0.053 | −0.324 | 0.010 | −1.169 | −0.095 | **−0.176** |
+| RBF R²    | −0.596 | −1.239 | 0.383 | −0.888 | −2.210 | −3.757 | 0.072 | **−1.176** |
 
-> Run `run_loocv.py` to populate these numbers.
+Direct RUL fails — EIS encodes current health, not total lifespan. Same-temperature cells with identical impedance can have different remaining lifetimes (2.4× spread).
 
 ### Capacity-Derived RUL (`run_cap_rul.py`)
 
-Direct EIS → RUL fails because EIS encodes current health, not total lifespan. Alternative approach:
+Alternative approach that avoids the EIS→RUL mapping problem:
 
 1. Predict full capacity trajectory via LOOCV GPR
 2. Fit linear trend to predicted trajectory
 3. Extrapolate to 80% threshold → predicted EOL
 4. RUL[i] = predicted_EOL − i
 
-Results: see `fig_cap_rul_trajectories.png` and `fig_cap_rul_scatter.png`.
+| Cell | CA1 | CA2 | CA3 | CA4 | CA5 | CA7 | CA8 | Mean |
+|------|-----|-----|-----|-----|-----|-----|-----|------|
+| Cap R² | 0.995 | 0.993 | 0.995 | 0.987 | 0.971 | 0.991 | 0.982 | 0.934 |
+| RUL R² | 0.999 | 0.994 | 0.767 | 0.550 | 0.999 | 0.973 | 0.967 | **0.893** |
+| Pred EOL | 173 | 164 | 182 | 113 | 115 | 91 | 212 | — |
+| Actual EOL | 174 | 168 | 214 | 143 | 116 | 96 | 224 | — |
+
+Capacity-derived RUL (mean R²=0.893) dramatically outperforms direct EIS→RUL (mean R²=−0.176). See `output/cap_rul/`.
 
 ---
 
@@ -319,7 +326,15 @@ Cold temperatures (our dataset):
 
 **Why capacity works but RUL doesn't:** Capacity is a snapshot — *how much charge can this cell deliver right now?* EIS → SOH holds regardless of mechanism. RUL requires knowing *how fast will this cell continue to decay?* — which depends on whether the degradation is irreversible electrochemical (SEI growth, Zhang's mechanism) or thermally driven (kinetic limitation, reversible). EIS alone cannot distinguish these, so the RUL signal breaks at −20°C even with a perfect DOE.
 
-**Implication:** Fractional RUL normalisation is worth trying as it eliminates the data problem, but physically motivated improvement may require pairing EIS with temperature-cycle history or a reversibility indicator.
+**Resolution — Capacity-Derived RUL:** Instead of fractional RUL (which has leakage issues), we use validated capacity GPR to predict the trajectory, then extrapolate to the 80% threshold. This avoids the EIS→RUL mapping entirely. Results per temperature:
+
+| Temperature | Cap-derived RUL R² | Direct EIS→RUL R² | Best approach |
+|-------------|--------------------|--------------------|---------------|
+| RT (25°C) | **0.893** | −4.3 | Cap-derived (LOOCV) |
+| −10°C | −0.82 | **0.734** | Direct (linear kernel) |
+| −20°C | **0.970** | 0.459 | Cap-derived (DOE) |
+
+No single method works at all temperatures — the optimal strategy depends on the degradation regime. At RT and −20°C, capacity prediction is accurate enough for extrapolation. At −10°C, the capacity model is too weak (R²=0.68) due to high cell-to-cell variability (EOL range 71–114 cycles with only 3–4 cells), but a single dominant ARD frequency (13.3 Hz) enables direct RUL prediction.
 
 ---
 
