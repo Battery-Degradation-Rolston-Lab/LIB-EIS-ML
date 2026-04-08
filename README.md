@@ -206,6 +206,89 @@ Kernel: **CoupledARD-RBF** (33 ls, Re+Im paired per frequency) for capacity; **L
 
 ---
 
+## Experiment 6 — Single-Temperature Fixed DOE + Coupled ARD (Zhang Fig 1/2 equivalent)
+
+**Script:** `run_ca_zhang.py` | **Data:** `ca_dataset/` + `multitemp_dataset/` | **Features:** 66
+
+Zhang Fig 1/2 style figures for each of our three temperature groups using the pre-specified experimental DOE. Capacity uses **Coupled ARD-RBF** (33 ls, Re+Im paired per frequency). RUL uses Linear kernel (Zhang eq. 5).
+
+### Pre-specified DOE
+
+| Group | Train | Test |
+|-------|-------|------|
+| RT (~25°C) | CA1–CA6 | CA7, CA8 |
+| −10°C | N10_CB1–3 | N10_CB4 |
+| −20°C | N20_CB1–3 | N20_CB4 |
+
+### Results
+
+| Group | Capacity R² | RUL R² | vs Zhang |
+|-------|-------------|--------|----------|
+| RT | CA7=0.996, CA8=0.991 | −4.3 (fails — single-T) | **beats Zhang 0.88** |
+| −10°C | N10_CB4=0.676 | **0.734** ✅ | New — cold single-T RUL works |
+| −20°C | N20_CB4=0.937 | 0.459 ⚠️ | New — cold single-T |
+
+### Capacity trajectories
+
+**RT (CA7, CA8):**
+
+![RT capacity](battery_gpytorch_rtx4060/battery_gpytorch/output/ca_zhang/fig_rt_1a_capacity_trajectories.png)
+
+**−10°C (N10_CB4):**
+
+![N10 capacity](battery_gpytorch_rtx4060/battery_gpytorch/output/ca_zhang/fig_n10_1a_capacity_trajectories.png)
+
+**−20°C (N20_CB4):**
+
+![N20 capacity](battery_gpytorch_rtx4060/battery_gpytorch/output/ca_zhang/fig_n20_1a_capacity_trajectories.png)
+
+### Coupled ARD weights per temperature
+
+**RT (~25°C):**
+
+![RT ARD](battery_gpytorch_rtx4060/battery_gpytorch/output/ca_zhang/fig_rt_1c_ARD_weights.png)
+
+**−10°C:**
+
+![N10 ARD](battery_gpytorch_rtx4060/battery_gpytorch/output/ca_zhang/fig_n10_1c_ARD_weights.png)
+
+**−20°C:**
+
+![N20 ARD](battery_gpytorch_rtx4060/battery_gpytorch/output/ca_zhang/fig_n20_1c_ARD_weights.png)
+
+| Group | Top frequency | Weight | Interpretation |
+|-------|--------------|--------|----------------|
+| RT | ~1 Hz + ~5000 Hz | dual peak | Low-freq SEI + high-freq bulk resistance |
+| **−10°C** | **13.3 Hz** | **1.0** | Single spike — pure SEI/charge-transfer signal |
+| −20°C | ~1 Hz + ~5000 Hz | dual peak | Similar to RT — kinetically limited regime |
+
+### RUL scatter
+
+**RT:**
+
+![RT RUL](battery_gpytorch_rtx4060/battery_gpytorch/output/ca_zhang/fig_rt_2_rul_scatter.png)
+
+**−10°C:**
+
+![N10 RUL](battery_gpytorch_rtx4060/battery_gpytorch/output/ca_zhang/fig_n10_2_rul_scatter.png)
+
+**−20°C:**
+
+![N20 RUL](battery_gpytorch_rtx4060/battery_gpytorch/output/ca_zhang/fig_n20_2_rul_scatter.png)
+
+
+### Comparison with Zhang
+
+| | Zhang (paper) | Ours |
+|--|--|--|
+| Single-T capacity | 25°C R²=0.88 | RT R²=0.99 — **better** |
+| Multi-T capacity | 35°C R²=0.81, 45°C R²=0.72 | Reproduced: 0.91, 0.94 — **beat both** |
+| Single-T RUL | Not attempted | −10°C R²=0.734 ✅ — **new** |
+| Multi-T RUL | 35°C R²=0.75, 45°C R²=0.92 | Reproduced: 0.85, 0.91 — **beat both** |
+| ARD kernel | Decoupled 120 ls | **Coupled 33 ls** — K-K correct |
+
+---
+
 ## Why Direct EIS → RUL Fails
 
 ### Case 1 — Same-temperature datasets (A1-A8, CA1-CA8)
@@ -251,6 +334,9 @@ Cold temperatures (our dataset):
 | 45°C multi-T (Fig 3d) | Decoupled ARD | #88 | ~20 Hz | ≈ Same region |
 | A1-A8 in-house LOOCV | Decoupled ARD | low-freq Im(Z) | ~1–20 Hz | Consistent |
 | CB multi-T (RT+−10+−20°C) | **Coupled ARD** | 1.33 Hz (w=0.71) | 1.33 Hz + 1000 Hz | SEI/diffusion + bulk resistance |
+| RT single-T (CA1–CA6) | **Coupled ARD** | ~1 Hz + ~5000 Hz | dual peak | Low-freq SEI + bulk resistance |
+| −10°C single-T (N10_CB1–3) | **Coupled ARD** | **13.3 Hz (w=1.0)** | single spike | Pure SEI/charge-transfer |
+| −20°C single-T (N20_CB1–3) | **Coupled ARD** | ~1 Hz + ~5000 Hz | dual peak | Similar to RT |
 
 Feature #100 (2.16 Hz) appears at 25°C only — sensitive to both temperature and degradation. Multi-T training acts as a regulariser that strips it out, isolating the temperature-independent degradation signal at 17.80 Hz.
 
@@ -268,7 +354,8 @@ Feature #100 (2.16 Hz) appears at 25°C only — sensitive to both temperature a
 | `run_cap_rul.py` | CA1-CA8 | Capacity-derived RUL via extrapolation | `fig_cap_rul_trajectories`, `fig_cap_rul_scatter` |
 | `run_freq_subset_loocv.py` | A1-A8 | Frequency band LOOCV | `fig_freq_subset_cap_heatmap`, `fig_freq_subset_rul_heatmap` |
 | `run_coupled_ard_loocv.py` | A1-A8 | Coupled vs decoupled ARD | `fig_ARD_coupled_vs_decoupled` |
-| `run_multitemp_zhang.py` | CA+CB multi-T | **Zhang DOE + Coupled ARD** (RT+−10°C+−20°C train, 1 held-out per temp) | `output/multitemp_zhang/` |
+| `run_ca_zhang.py` | CA+CB single-T | **Zhang Fig 1/2 equivalent** — fixed DOE, Coupled ARD cap + Linear RUL per temp group | `output/ca_zhang/` |
+| `run_multitemp_zhang.py` | CA+CB multi-T | **Zhang Fig 3/4 equivalent** — Zhang DOE + Coupled ARD cap + Linear RUL | `output/multitemp_zhang/` |
 | `run_multitemp_rul.py` | CA+CB multi-T | Baseline multi-T RUL (train RT+−10°C, test −20°C) + decoupled ARD | `output/multitemp/` |
 | `run_multitemp_approaches.py` | CA+CB multi-T | LOOCV multi-T and relative-feature normalisation approaches | `output/multitemp/` |
 | `preprocess_new_dataset.py` | Battery data.zip | Extract A1-A8 EIS + capacity | `data/new_dataset/` |

@@ -35,6 +35,9 @@ python battery_gpytorch_rtx4060/battery_gpytorch/run_cap_rul.py
 python battery_gpytorch_rtx4060/battery_gpytorch/run_multitemp_approaches.py
 python battery_gpytorch_rtx4060/battery_gpytorch/run_multitemp_rul.py
 
+# Single-T fixed DOE per temperature group (Zhang Fig 1/2 equivalent)
+python battery_gpytorch_rtx4060/battery_gpytorch/run_ca_zhang.py
+
 # Multi-temp replication on Zhang data
 python battery_gpytorch_rtx4060/battery_gpytorch/run_multitemp_zhang.py
 
@@ -71,6 +74,7 @@ LIB-EIS-ML/
 │       ├── run_cap_rul.py              ← capacity-derived RUL (CA1-CA8)
 │       ├── run_freq_subset_loocv.py    ← frequency band LOOCV (A1-A8)
 │       ├── run_coupled_ard_loocv.py    ← coupled ARD (A1-A8)
+│       ├── run_ca_zhang.py             ← single-T fixed DOE per temp group (Zhang Fig 1/2)
 │       ├── run_multitemp_approaches.py ← multi-temp CB dataset approaches
 │       ├── run_multitemp_rul.py        ← multi-temp CB dataset RUL
 │       ├── run_multitemp_zhang.py      ← multi-temp replication on Zhang data
@@ -129,6 +133,13 @@ LIB-EIS-ML/
 | CB Multi-temp Capacity (Zhang DOE) | N10_CB4 R²=0.375 / N20_CB4 R²=0.949 | All temps in training — Zhang-faithful |
 | CB Multi-temp RUL (Zhang DOE) | N10_CB4 R²=0.226 / N20_CB4 R²=−120 | -20°C RUL range 0-17 vs RT 0-214 — scale mismatch |
 | CB Coupled ARD (Zhang DOE) | top: 1.33 Hz (w=0.71) | 33 ls, Re+Im paired per frequency |
+| RT single-T cap (Coupled ARD) | CA7=0.996, CA8=0.991 | Zhang Fig 1a equivalent — `run_ca_zhang.py` |
+| −10°C single-T cap (Coupled ARD) | N10_CB4 R²=0.676 | Zhang Fig 1a equivalent — `run_ca_zhang.py` |
+| −20°C single-T cap (Coupled ARD) | N20_CB4 R²=0.937 | Zhang Fig 1a equivalent — `run_ca_zhang.py` |
+| RT single-T RUL | R²=−4.3 (fails) | Zhang Fig 2 equivalent — absolute RUL scale mismatch |
+| −10°C single-T RUL | R²=0.734 | Zhang Fig 2 equivalent — works |
+| −20°C single-T RUL | R²=0.459 | Zhang Fig 2 equivalent |
+| Coupled ARD −10°C (single-T) | 13.3 Hz (w=1.0) | Single dominant frequency |
 
 ---
 

@@ -50,10 +50,17 @@ Zenodo: https://doi.org/10.5281/zenodo.3633835
 - **Feature #66 (0.999 Hz, Im(Z))** — w=0.393 (measurement floor — diffusion region just below 1 Hz)
 - **Feature #56 (17.8 Hz, Im(Z))** — w=0.045 (SEI feature, analogous to #91)
 
+### CB Multi-temperature dataset (66-feature, Coupled ARD — Zhang DOE)
+- **1.33 Hz (w=0.64)** — dominant: lowest measured frequency, SEI/diffusion boundary
+- **1000 Hz (w=0.36)** — secondary: bulk resistance / charge-transfer transition
+- All 31 other frequencies suppressed (length-scale → upper bound)
+- Sharper than decoupled ARD because Re+Im paired: 33 ls instead of 66
+
 ### Physical Interpretation
 - 17.80 Hz probes the solid-electrolyte interphase (SEI) layer — grows irreversibly with cycling
 - SEI growth is the dominant LCO/graphite degradation mechanism, discovered purely from data
 - Multi-T training acts as regulariser: strips temperature-confounded features, keeps degradation-robust ones
+- Coupled ARD (one ls per frequency) is physically correct: Kramers-Kronig relations couple Re and Im — treating them independently gives ambiguous importance scores
 
 ---
 
@@ -89,3 +96,8 @@ to A7 (RUL_max=190) or A8 (RUL_max=448).
 
 **Solution under investigation**: capacity-derived RUL — predict capacity trajectory with
 GPR (already R²=0.964), fit degradation curve, extrapolate to 80% threshold.
+
+**Multi-T RUL failure (CB dataset):** −20°C cells live only 17–21 cycles vs RT 200+ cycles.
+Even with Zhang DOE (all temps in training), the absolute RUL range is completely mismatched.
+**Fix**: fractional RUL — normalise each cell's RUL by its own RUL_max before training,
+so all cells map to [0, 1]. This removes the absolute scale mismatch across temperatures.
