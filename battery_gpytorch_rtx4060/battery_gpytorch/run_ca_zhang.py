@@ -1,12 +1,10 @@
 """
 Single-temperature GPR — Zhang Fig 1 / Fig 2 equivalent for each temperature.
-
-Produces the same figure types as Zhang et al. 2020 Figs 1a, 1b, 1c, 2
-for each of our three temperature groups independently.
+Capacity model uses Coupled ARD-RBF (33 ls, Re+Im paired per frequency).
 
 Pre-specified experimental DOE (not a post-hoc split — designated before data collection)
 ------------------------------------------------------------------------------------------
-  RT   (~25°C) : train CA1–CA6,    test CA7, CA8    (same DOE as multi-T scripts)
+  RT   (~25°C) : train CA1–CA6,    test CA7, CA8
   -10°C        : train N10_CB1–3,  test N10_CB4
   -20°C        : train N20_CB1–3,  test N20_CB4
 
@@ -14,15 +12,15 @@ For RUL: CA6 is DNF — excluded from RT RUL training. All CB cells reached EOL.
 
 Figures per temperature group
 ------------------------------
-  fig_{T}_1a_capacity_trajectories.png  — GPR capacity vs cycle  (Zhang Fig 1a)
+  fig_{T}_1a_capacity_trajectories.png  — GPR capacity vs cycle       (Zhang Fig 1a)
   fig_{T}_1b_capacity_scatter.png       — predicted vs actual scatter  (Zhang Fig 1b)
-  fig_{T}_1c_ARD_weights.png            — ARD feature importance  (Zhang Fig 1c)
-  fig_{T}_2_rul_scatter.png             — predicted vs actual RUL  (Zhang Fig 2)
+  fig_{T}_1c_ARD_weights.png            — Coupled ARD per frequency    (Zhang Fig 1c)
+  fig_{T}_2_rul_scatter.png             — predicted vs actual RUL      (Zhang Fig 2)
 
 Kernel
 ------
-  Capacity : ScaleKernel(RBF-ARD, 66 ls)  — one length-scale per EIS feature
-  RUL      : ScaleKernel(LinearKernel)    — Zhang eq. 5, zero mean
+  Capacity : CoupledARD-RBF  (sklearn, 33 ls — one per frequency, shared Re+Im)
+  RUL      : ScaleKernel(LinearKernel)  (GPyTorch, Zhang eq. 5, zero mean)
 
 Normalisation: training-only z-score for both capacity and RUL
 """
@@ -37,6 +35,10 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from pathlib import Path
+from sklearn.gaussian_process import GaussianProcessRegressor
+from sklearn.gaussian_process.kernels import (
+    ConstantKernel, WhiteKernel, Kernel, Hyperparameter
+)
 from sklearn.metrics import r2_score
 
 SCRIPT_DIR = Path(__file__).parent
@@ -52,6 +54,7 @@ if DEVICE.type == 'cuda':
 
 np.random.seed(42)
 torch.manual_seed(42)
+RNG = np.random.default_rng(42)
 
 NATIVE_FREQS = np.array([
     10000.0, 7500.0, 5620.0, 4220.0, 3160.0, 2370.0, 1780.0, 1330.0,
@@ -61,6 +64,8 @@ NATIVE_FREQS = np.array([
 ])
 N_FREQ = len(NATIVE_FREQS)  # 33
 
+ARD_MAX_N = 600   # subsample for sklearn (K is O(N²)); RT has ~2500 rows
+
 # ── Temperature group definitions ─────────────────────────────────────────────
 GROUPS = {
     'RT': {
@@ -69,7 +74,7 @@ GROUPS = {
         'cap_train' : ['CA1', 'CA2', 'CA3', 'CA4', 'CA5', 'CA6'],
         'rul_train' : ['CA1', 'CA2', 'CA3', 'CA4', 'CA5'],   # CA6 DNF
         'test'      : ['CA7', 'CA8'],
-        'data_dir'  : None,   # set below
+        'data_dir'  : None,
     },
     'N10': {
         'label'     : '-10°C',
@@ -91,6 +96,55 @@ GROUPS = {
 GROUPS['RT']['data_dir']  = CA_DATA
 GROUPS['N10']['data_dir'] = MT_DATA
 GROUPS['N20']['data_dir'] = MT_DATA
+
+
+# ── Coupled ARD-RBF kernel (sklearn) ─────────────────────────────────────────
+# One length-scale per frequency, shared between Re(Z) and -Im(Z).
+# k(x,x') = exp(−Σᵢ [(Re_i−Re_i')² + (Im_i−Im_i')²] / (2·lᵢ²))
+
+class CoupledARDRBF(Kernel):
+    def __init__(self, length_scale=None, length_scale_bounds=(1e-5, 1e5)):
+        if length_scale is None:
+            length_scale = np.ones(N_FREQ)
+        self.length_scale        = np.asarray(length_scale, dtype=float)
+        self.length_scale_bounds = length_scale_bounds
+
+    @property
+    def hyperparameter_length_scale(self):
+        return Hyperparameter('length_scale', 'numeric',
+                              self.length_scale_bounds, n_elements=N_FREQ)
+
+    def __call__(self, X, Y=None, eval_gradient=False):
+        X_re = X[:, :N_FREQ];  X_im = X[:, N_FREQ:]
+        if Y is None:
+            Y_re, Y_im = X_re, X_im
+        else:
+            Y_re, Y_im = Y[:, :N_FREQ], Y[:, N_FREQ:]
+        ls = self.length_scale
+        N, M = X_re.shape[0], Y_re.shape[0]
+        dist2 = np.zeros((N, M))
+        for i in range(N_FREQ):
+            dr = X_re[:, i:i+1] - Y_re[:, i]
+            di = X_im[:, i:i+1] - Y_im[:, i]
+            dist2 += (dr**2 + di**2) / (2.0 * ls[i]**2)
+        K = np.exp(-dist2)
+        if eval_gradient:
+            dK = np.empty((N, M, N_FREQ))
+            for i in range(N_FREQ):
+                dr = X_re[:, i:i+1] - Y_re[:, i]
+                di = X_im[:, i:i+1] - Y_im[:, i]
+                dK[:, :, i] = K * (dr**2 + di**2) / ls[i]**2
+            return K, dK
+        return K
+
+    def diag(self, X):
+        return np.ones(X.shape[0])
+
+    def is_stationary(self):
+        return True
+
+    def __repr__(self):
+        return f'CoupledARDRBF(ls={self.length_scale.round(3)})'
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -116,17 +170,7 @@ def ard_weights(ls):
 def to_t(a): return torch.tensor(a, dtype=torch.float32, device=DEVICE)
 
 
-# ── GPyTorch models ───────────────────────────────────────────────────────────
-
-class ARDModel(gpytorch.models.ExactGP):
-    def __init__(self, tx, ty, lh):
-        super().__init__(tx, ty, lh)
-        self.mean_module  = gpytorch.means.ConstantMean()
-        self.covar_module = gpytorch.kernels.ScaleKernel(
-            gpytorch.kernels.RBFKernel(ard_num_dims=66))
-    def forward(self, x):
-        return gpytorch.distributions.MultivariateNormal(
-            self.mean_module(x), self.covar_module(x))
+# ── GPyTorch Linear model (RUL) ───────────────────────────────────────────────
 
 class LinearModel(gpytorch.models.ExactGP):
     def __init__(self, tx, ty, lh):
@@ -156,7 +200,7 @@ def train_gp(model, lh, tx, ty, n_iter=800, lr=0.05):
     if best_sd: model.load_state_dict(best_sd)
     return model, lh
 
-def predict(model, lh, tx):
+def predict_gp(model, lh, tx):
     model.eval(); lh.eval()
     with torch.no_grad(), gpytorch.settings.fast_pred_var():
         p = lh(model(tx))
@@ -170,11 +214,8 @@ def predict(model, lh, tx):
 summary = {}
 
 for gkey, G in GROUPS.items():
-    label    = G['label']
-    col      = G['color']
-    ddir     = G['data_dir']
-    test     = G['test']
-    tag      = gkey.lower()   # 'rt', 'n10', 'n20'
+    label = G['label'];  col = G['color'];  ddir = G['data_dir']
+    test  = G['test'];   tag = gkey.lower()
 
     print('\n' + '═'*60)
     print(f'TEMPERATURE GROUP: {label}')
@@ -197,39 +238,42 @@ for gkey, G in GROUPS.items():
     _, mu_rul, sig_rul = zscore(EIS_rul_tr)
     X_cap_tr_n = apply_norm(EIS_cap_tr, mu_cap, sig_cap)
     X_rul_tr_n = apply_norm(EIS_rul_tr, mu_rul, sig_rul)
-    y_mean = Cap_tr.mean();  y_std = Cap_tr.std()
-    y_cap_tr_n = (Cap_tr - y_mean) / y_std
 
-    # ── Capacity ARD model ────────────────────────────────────────────────────
-    print(f'\n  [Capacity ARD-RBF]')
-    tx = to_t(X_cap_tr_n);  ty = to_t(y_cap_tr_n)
-    lh = gpytorch.likelihoods.GaussianLikelihood().to(DEVICE)
-    m  = ARDModel(tx, ty, lh).to(DEVICE)
-    m, lh = train_gp(m, lh, tx, ty, n_iter=800)
+    # ── Capacity: Coupled ARD-RBF (sklearn) ───────────────────────────────────
+    print(f'\n  [Capacity — Coupled ARD-RBF, 33 ls]')
+    n_sub = min(ARD_MAX_N, len(X_cap_tr_n))
+    idx   = RNG.choice(len(X_cap_tr_n), n_sub, replace=False)
+    X_sub = X_cap_tr_n[idx];  y_sub = Cap_tr[idx]
 
-    ls = m.covar_module.base_kernel.lengthscale.detach().cpu().numpy().ravel()
-    w  = ard_weights(ls)
-    w_re = w[:N_FREQ];  w_im = w[N_FREQ:]
-    top_re = np.argmax(w_re);  top_im = np.argmax(w_im)
-    print(f'  Top Re(Z): {NATIVE_FREQS[top_re]:.2f} Hz  (w={w_re[top_re]:.4f})')
-    print(f'  Top Im(Z): {NATIVE_FREQS[top_im]:.2f} Hz  (w={w_im[top_im]:.4f})')
+    kernel = (ConstantKernel(1.0) *
+              CoupledARDRBF(length_scale=np.ones(N_FREQ)) +
+              WhiteKernel(noise_level=1.0))
+    gpr = GaussianProcessRegressor(kernel=kernel, normalize_y=True,
+                                   alpha=0.1, n_restarts_optimizer=10)
+    print(f'  Fitting on {n_sub} subsampled rows ...')
+    gpr.fit(X_sub, y_sub)
+
+    ls_cap = gpr.kernel_.k1.k2.length_scale   # (33,)
+    w_cap  = ard_weights(ls_cap)
+    top_idx = np.argmax(w_cap)
+    print(f'  Top frequency: {NATIVE_FREQS[top_idx]:.2f} Hz  (w={w_cap[top_idx]:.4f})')
 
     r2_cap = {};  pred_cap = {};  meas_cap = {}
     all_pred = [];  all_meas = []
 
     for cell in test:
         eis_te, cap_te = load_cap(cell, ddir)
-        mn, sd = predict(m, lh, to_t(apply_norm(eis_te, mu_cap, sig_cap)))
-        mn_mah = mn * y_std + y_mean;  sd_mah = sd * y_std
-        r2 = r2_score(cap_te, mn_mah)
-        r2_cap[cell] = r2;  pred_cap[cell] = (mn_mah, sd_mah);  meas_cap[cell] = cap_te
-        all_pred.extend(mn_mah.tolist());  all_meas.extend(cap_te.tolist())
+        X_te_n = apply_norm(eis_te, mu_cap, sig_cap)
+        mn = gpr.predict(X_te_n)
+        r2 = r2_score(cap_te, mn)
+        r2_cap[cell] = r2;  pred_cap[cell] = mn;  meas_cap[cell] = cap_te
+        all_pred.extend(mn.tolist());  all_meas.extend(cap_te.tolist())
         print(f'  {cell}: Cap R² = {r2:.4f}')
 
     r2_scatter = r2_score(np.array(all_meas), np.array(all_pred))
 
-    # ── RUL Linear model ──────────────────────────────────────────────────────
-    print(f'\n  [RUL Linear]')
+    # ── RUL: Linear GPyTorch ──────────────────────────────────────────────────
+    print(f'\n  [RUL — Linear kernel]')
     tx_r = to_t(X_rul_tr_n);  ty_r = to_t(RUL_tr.astype(np.float32))
     lh_r = gpytorch.likelihoods.GaussianLikelihood().to(DEVICE)
     m_r  = LinearModel(tx_r, ty_r, lh_r).to(DEVICE)
@@ -238,7 +282,8 @@ for gkey, G in GROUPS.items():
     r2_rul = {};  pred_rul = {};  meas_rul = {}
     for cell in test:
         eis_te, rul_te = load_rul(cell, ddir)
-        mn_r, sd_r = predict(m_r, lh_r, to_t(apply_norm(eis_te, mu_rul, sig_rul)))
+        mn_r, sd_r = predict_gp(m_r, lh_r,
+                                 to_t(apply_norm(eis_te, mu_rul, sig_rul)))
         r2 = r2_score(rul_te, mn_r)
         r2_rul[cell] = r2;  pred_rul[cell] = (mn_r, sd_r);  meas_rul[cell] = rul_te
         print(f'  {cell}: RUL R² = {r2:.4f}  '
@@ -246,32 +291,26 @@ for gkey, G in GROUPS.items():
 
     summary[gkey] = {'r2_cap': r2_cap, 'r2_rul': r2_rul, 'r2_scatter': r2_scatter}
 
+    test_colors = [col] * len(test)
+
     # ── Fig 1a — Capacity trajectories ───────────────────────────────────────
     n_test = len(test)
-    fig, axes = plt.subplots(1, n_test, figsize=(6 * n_test, 5),
-                             squeeze=False)
+    fig, axes = plt.subplots(1, n_test, figsize=(6 * n_test, 5), squeeze=False)
     axes = axes[0]
-    test_colors = [col] * n_test
-
-    for idx, cell in enumerate(test):
-        ax = axes[idx]
-        cap_te = meas_cap[cell];  mn_mah, sd_mah = pred_cap[cell]
+    for idx2, cell in enumerate(test):
+        ax = axes[idx2]
+        cap_te = meas_cap[cell];  mn = pred_cap[cell]
         cap0 = cap_te[0];  cyc = np.arange(len(cap_te))
-        ax.fill_between(cyc,
-                        (mn_mah - sd_mah) / cap0, (mn_mah + sd_mah) / cap0,
-                        alpha=0.25, color=test_colors[idx])
         ax.plot(cyc, cap_te / cap0, 'x', color='grey', ms=3, alpha=0.6,
                 label='Measured')
-        ax.plot(cyc, mn_mah / cap0, '-', color=test_colors[idx], lw=1.8,
-                label='GPR')
+        ax.plot(cyc, mn / cap0, '-', color=test_colors[idx2], lw=1.8,
+                label='GPR (Coupled ARD)')
         ax.axhline(0.8, color='black', lw=0.8, ls='--', alpha=0.5)
         ax.set_title(f'{cell} ({label})\nR²={r2_cap[cell]:.3f}', fontsize=10)
-        ax.set_xlabel('Cycle', fontsize=9)
-        ax.set_ylabel('Norm. Capacity', fontsize=9)
+        ax.set_xlabel('Cycle', fontsize=9);  ax.set_ylabel('Norm. Capacity', fontsize=9)
         ax.legend(fontsize=8, frameon=False);  ax.grid(True, alpha=0.3)
-
     fig.suptitle(f'Capacity GPR — Single-T {label}\n'
-                 f'Train: {G["cap_train"]}  |  ARD-RBF',
+                 f'Train: {G["cap_train"]}  |  Coupled ARD-RBF (33 ls)',
                  fontsize=11, fontweight='bold')
     plt.tight_layout()
     plt.savefig(OUT / f'fig_{tag}_1a_capacity_trajectories.png', dpi=150)
@@ -280,9 +319,9 @@ for gkey, G in GROUPS.items():
     # ── Fig 1b — Capacity scatter ─────────────────────────────────────────────
     all_pred_a = np.array(all_pred);  all_meas_a = np.array(all_meas)
     fig, ax = plt.subplots(figsize=(5, 5))
-    for idx, cell in enumerate(test):
-        ax.scatter(meas_cap[cell], pred_cap[cell][0],
-                   s=8, alpha=0.6, color=test_colors[idx], label=cell)
+    for idx2, cell in enumerate(test):
+        ax.scatter(meas_cap[cell], pred_cap[cell],
+                   s=8, alpha=0.6, color=test_colors[idx2], label=cell)
     lo = min(all_meas_a.min(), all_pred_a.min()) * 0.98
     hi = max(all_meas_a.max(), all_pred_a.max()) * 1.02
     ax.plot([lo, hi], [lo, hi], 'k--', lw=1, alpha=0.6)
@@ -296,39 +335,45 @@ for gkey, G in GROUPS.items():
     plt.savefig(OUT / f'fig_{tag}_1b_capacity_scatter.png', dpi=150)
     plt.close()
 
-    # ── Fig 1c — ARD weights ──────────────────────────────────────────────────
-    freqs_plot = NATIVE_FREQS[::-1]
-    wr_p = w_re[::-1];  wi_p = w_im[::-1]
+    # ── Fig 1c — Coupled ARD weights (one per frequency) ─────────────────────
+    freqs_plot = NATIVE_FREQS[::-1]   # low → high
+    w_plot     = w_cap[::-1]
+
     fig, ax = plt.subplots(figsize=(11, 4))
-    ax.semilogx(freqs_plot, wr_p, 'r-^', ms=5, lw=1.5, label='Re(Z)')
-    ax.semilogx(freqs_plot, wi_p, color='orange', ls='--', marker='v',
-                ms=5, lw=1.5, label='-Im(Z)')
+    ax.semilogx(freqs_plot, w_plot, 'b-o', ms=5, lw=1.8,
+                label='|Z(ω)| — Re & Im paired')
+    ax.fill_between(freqs_plot, 0, w_plot, alpha=0.15, color='blue')
     ax.axhline(0, color='black', lw=0.6)
-    for freq, wval, c in [(NATIVE_FREQS[top_re], w_re[top_re], 'red'),
-                          (NATIVE_FREQS[top_im], w_im[top_im], 'darkorange')]:
-        ax.annotate(f'{freq:.1f} Hz', xy=(freq, wval),
-                    xytext=(freq * 2.5, wval * 1.1), fontsize=9, color=c,
-                    arrowprops=dict(arrowstyle='->', color=c, lw=1.2))
+
+    top_plot_idx = N_FREQ - 1 - top_idx
+    ax.annotate(f'{NATIVE_FREQS[top_idx]:.2f} Hz',
+                xy=(freqs_plot[top_plot_idx], w_plot[top_plot_idx]),
+                xytext=(freqs_plot[top_plot_idx] * 3,
+                        w_plot[top_plot_idx] * 1.1),
+                fontsize=10, color='blue',
+                arrowprops=dict(arrowstyle='->', color='blue', lw=1.2))
+
     ax.set_xlabel('Frequency (Hz)', fontsize=13)
     ax.set_ylabel('ARD weight', fontsize=13)
-    ax.set_title(f'ARD feature importance — Single-T {label}\n'
-                 f'Train: {G["cap_train"]}  |  66 length-scales', fontsize=11)
+    ax.set_title(f'Coupled ARD — Single-T {label}\n'
+                 f'Train: {G["cap_train"]}  |  33 ls, Re+Im paired per frequency',
+                 fontsize=11)
     ax.legend(fontsize=10);  ax.grid(True, alpha=0.3)
     plt.tight_layout()
     plt.savefig(OUT / f'fig_{tag}_1c_ARD_weights.png', dpi=150)
     plt.close()
 
     # ── Fig 2 — RUL scatter ───────────────────────────────────────────────────
-    fig, axes = plt.subplots(1, n_test, figsize=(5 * n_test, 5),
-                             squeeze=False)
+    fig, axes = plt.subplots(1, n_test, figsize=(5 * n_test, 5), squeeze=False)
     axes = axes[0]
-    for idx, cell in enumerate(test):
-        ax = axes[idx]
+    for idx2, cell in enumerate(test):
+        ax = axes[idx2]
         rul_te = meas_rul[cell];  mn_r, sd_r = pred_rul[cell]
         lim = max(rul_te.max(), mn_r.max()) * 1.1
         ax.fill_between(rul_te, mn_r - sd_r, mn_r + sd_r,
-                        alpha=0.3, color=test_colors[idx])
-        ax.scatter(rul_te, mn_r, s=20, color=test_colors[idx], alpha=0.85, zorder=3)
+                        alpha=0.3, color=test_colors[idx2])
+        ax.scatter(rul_te, mn_r, s=20, color=test_colors[idx2],
+                   alpha=0.85, zorder=3)
         ax.plot([0, lim], [0, lim], 'k--', lw=1, alpha=0.5)
         ax.set_xlim(0, lim);  ax.set_ylim(0, lim)
         ax.set_xlabel('Actual RUL (bat-cycles)', fontsize=10)
@@ -350,7 +395,7 @@ for gkey, G in GROUPS.items():
 # Final summary
 # ═══════════════════════════════════════════════════════════════════════════════
 print('\n' + '═'*60)
-print('FINAL SUMMARY — Single-T results per temperature group')
+print('FINAL SUMMARY — Single-T Coupled ARD results per temperature')
 print('═'*60)
 print(f'\n{"Group":<6}  {"Temp":>7}  {"Cap scatter R²":>15}  {"RUL R² (mean)":>14}')
 print('-'*50)
