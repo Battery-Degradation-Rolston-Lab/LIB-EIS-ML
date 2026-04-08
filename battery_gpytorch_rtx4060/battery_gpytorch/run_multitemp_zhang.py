@@ -71,7 +71,7 @@ N20_TRAIN      = ['N20_CB1', 'N20_CB2', 'N20_CB3']
 N10_TEST       = ['N10_CB4']   # -10°C held-out
 N20_TEST       = ['N20_CB4']   # -20°C held-out
 
-ARD_MAX_N = 400   # subsample for sklearn ARD (K is O(N²))
+ARD_MAX_N = 800   # subsample for sklearn ARD (K is O(N²)); increase for better compute
 
 print(f'\nZhang DOE:')
 print(f'  Capacity train : {CA_TRAIN}')
@@ -263,7 +263,7 @@ kernel_cap = (ConstantKernel(1.0) *
               CoupledARDRBF(length_scale=np.ones(N_FREQ)) +
               WhiteKernel(noise_level=1.0))
 gpr_cap = GaussianProcessRegressor(kernel=kernel_cap, normalize_y=True,
-                                   alpha=0.1, n_restarts_optimizer=3)
+                                   alpha=0.1, n_restarts_optimizer=15)
 print('  Fitting Coupled ARD-RBF ...')
 gpr_cap.fit(X_sub, y_sub)
 
@@ -307,7 +307,7 @@ lh_rul  = gpytorch.likelihoods.GaussianLikelihood().to(DEVICE)
 m_rul   = LinearModel(tx_rul, ty_rul, lh_rul).to(DEVICE)
 
 print('  Training ...')
-m_rul, lh_rul = train_gp(m_rul, lh_rul, tx_rul, ty_rul, n_iter=600, lr=0.05)
+m_rul, lh_rul = train_gp(m_rul, lh_rul, tx_rul, ty_rul, n_iter=1200, lr=0.05)
 
 test_cells_rul = N10_TEST + N20_TEST
 r2_rul = {}
