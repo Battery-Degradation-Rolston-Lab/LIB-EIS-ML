@@ -208,9 +208,35 @@ Kernel: **CoupledARD-RBF** (33 ls, Re+Im paired per frequency) for capacity; **L
 
 ## Why Direct EIS → RUL Fails
 
-All A1-A8 / CA1-CA8 cells operate at the same temperature, C-rate, and conditions. Total lifetimes span **190–448 cycles (2.4× range)**. Two cells at identical State of Health (same EIS signature) can have completely different remaining lives depending on their intrinsic total lifespan — which EIS cannot encode.
+### Case 1 — Same-temperature datasets (A1-A8, CA1-CA8)
+
+All cells operate at the same temperature, C-rate, and conditions. Total lifetimes span **190–448 cycles (2.4× range)**. Two cells at identical State of Health (same EIS signature) can have completely different remaining lives depending on their intrinsic total lifespan — which EIS cannot encode.
 
 For EIS → RUL to work, training cells need **diverse lifetimes driven by physically distinguishable conditions**. Temperature variation is the strongest lever: higher temperature simultaneously shifts EIS (Arrhenius) and accelerates degradation, creating a genuine learnable link between impedance signature and remaining life. This is why the paper succeeds — it exploits a multi-temperature DOE specifically designed for this.
+
+### Case 2 — Cold temperature dataset (−20°C CB cells): physics, not just data
+
+The −20°C RUL failure has two causes. The data problem is surface-level; the physics problem is deeper.
+
+**Data problem (fixable):** −20°C cells have RUL_max = 17–21 cycles vs RT 200+ cycles. The linear model is calibrated on RT-scale RUL — 17 cycles is completely out-of-distribution in the output space. Fractional RUL (normalise each cell's RUL by its own RUL_max before training) removes the scale mismatch.
+
+**Physics problem (fundamental):** Zhang's success at 35/45°C depended on a physical chain that does not hold at negative temperatures:
+
+```
+Warm temperatures (Zhang):
+  Higher T → faster SEI growth → shorter life AND larger Im(Z) at ~18 Hz
+  EIS encodes both current degradation state and future degradation rate → RUL learnable
+
+Cold temperatures (our dataset):
+  Lower T → slower ion kinetics → high Re(Z) (0.45 Ω vs 0.05 Ω at RT)
+           → short capacity life — but driven by kinetic limitation, not irreversible SEI damage
+  Capacity loss at −20°C is largely thermally reversible (warm the cell → capacity recovers)
+  EIS encodes thermal kinetics, not irreversible degradation → RUL signal absent
+```
+
+**Why capacity works but RUL doesn't:** Capacity is a snapshot — *how much charge can this cell deliver right now?* EIS → SOH holds regardless of mechanism. RUL requires knowing *how fast will this cell continue to decay?* — which depends on whether the degradation is irreversible electrochemical (SEI growth, Zhang's mechanism) or thermally driven (kinetic limitation, reversible). EIS alone cannot distinguish these, so the RUL signal breaks at −20°C even with a perfect DOE.
+
+**Implication:** Fractional RUL normalisation is worth trying as it eliminates the data problem, but physically motivated improvement may require pairing EIS with temperature-cycle history or a reversibility indicator.
 
 ---
 
@@ -218,14 +244,17 @@ For EIS → RUL to work, training cells need **diverse lifetimes driven by physi
 
 **Feature #91 (17.80 Hz, Im(Z)) is the universal degradation indicator** — dominant across all temperatures in ARD analysis:
 
-| Dataset | Top feature | Frequency | Interpretation |
-|---------|------------|-----------|----------------|
-| 35°C single-cell (Fig 3c) | **#91** | 17.80 Hz | ✅ Exact match |
-| 25°C four-cell (Fig 1c) | #91, #100 in top-5 | 17.80 Hz & 2.16 Hz | ✅ Same region |
-| 45°C multi-T (Fig 3d) | #88 | ~20 Hz | ≈ Same region |
-| A1-A8 in-house (LOOCV ARD) | low-freq Im(Z) | ~1–20 Hz | Consistent |
+| Dataset | Kernel | Top feature | Frequency | Interpretation |
+|---------|--------|------------|-----------|----------------|
+| 35°C single-cell (Fig 3c) | Decoupled ARD | **#91** | 17.80 Hz | ✅ Exact match |
+| 25°C four-cell (Fig 1c) | Decoupled ARD | #91, #100 in top-5 | 17.80 Hz & 2.16 Hz | ✅ Same region |
+| 45°C multi-T (Fig 3d) | Decoupled ARD | #88 | ~20 Hz | ≈ Same region |
+| A1-A8 in-house LOOCV | Decoupled ARD | low-freq Im(Z) | ~1–20 Hz | Consistent |
+| CB multi-T (RT+−10+−20°C) | **Coupled ARD** | 1.33 Hz (w=0.71) | 1.33 Hz + 1000 Hz | SEI/diffusion + bulk resistance |
 
-Feature #100 (2.16 Hz) appears at 25°C only — it is sensitive to both temperature and degradation. Multi-temperature training acts as a regulariser that strips it out, isolating the temperature-independent degradation signal at 17.80 Hz.
+Feature #100 (2.16 Hz) appears at 25°C only — sensitive to both temperature and degradation. Multi-T training acts as a regulariser that strips it out, isolating the temperature-independent degradation signal at 17.80 Hz.
+
+**Coupled ARD** (33 length-scales, Re+Im paired per frequency) gives physically interpretable importance scores — Kramers-Kronig relations couple Re(Z) and Im(Z) at every frequency, making decoupled 66-ls attribution ambiguous. The CB multi-T model concentrates all weight into just 2 frequencies, consistent with a simpler degradation signature at low temperatures.
 
 ---
 
