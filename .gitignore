@@ -31,9 +31,11 @@ __MACOSX/
 # Office temp files
 ~$*
 
-# PowerPoint and presentation artefacts
-*.pptx
+# PowerPoint and presentation artefacts (legacy scripts)
 make_ppt.py
 add_paper2_slides.py
+
+# Allow presentation directory
+!presentation/
 add_speaker_notes.py
 paper_text.txt
