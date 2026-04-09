@@ -116,8 +116,8 @@ def parse_mpt(path: Path) -> tuple:
             skipped += 1
             continue
 
-        re_vals = np.array([freq_dict[f][0] for f in meas_freqs])
-        im_vals = np.array([freq_dict[f][1] for f in meas_freqs])
+        re_vals = np.array([freq_dict[f][0] for f in meas_freqs[:N_FREQS]])
+        im_vals = np.array([freq_dict[f][1] for f in meas_freqs[:N_FREQS]])
         eis_matrix.append(np.concatenate([re_vals, im_vals]))
         capacities.append(cap_rows[cy])
 

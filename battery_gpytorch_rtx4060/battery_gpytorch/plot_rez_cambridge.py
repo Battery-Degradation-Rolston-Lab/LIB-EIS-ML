@@ -8,17 +8,19 @@ EIS measured every 2 battery cycles → cycle = row_index * 2.
 """
 
 import numpy as np
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-import os
+from pathlib import Path
 
-DATA = r"C:\Users\hithe\Downloads\paper reproduce\battery_gpytorch_rtx4060\battery_gpytorch\data"
-OUT  = r"C:\Users\hithe\Downloads\paper reproduce\battery_gpytorch_rtx4060\battery_gpytorch\output\new_dataset"
-os.makedirs(OUT, exist_ok=True)
+DATA = Path(__file__).parent / "data"
+OUT  = Path(__file__).parent / "output" / "new_dataset"
+OUT.mkdir(parents=True, exist_ok=True)
 
 # ── Load Cambridge cells ──────────────────────────────────────────────────────
 # 25C train = 25C01 (200) + 25C02 (250) + 25C03 (229) = 679 rows
-eis_25_train = np.loadtxt(os.path.join(DATA, "EIS_data_25C_train.txt"))
-cap_25_train = np.loadtxt(os.path.join(DATA, "Capacity_data_25C_train.txt"))
+eis_25_train = np.loadtxt(DATA / "EIS_data_25C_train.txt")
+cap_25_train = np.loadtxt(DATA / "Capacity_data_25C_train.txt")
 
 splits = {"25C01": (0, 200), "25C02": (200, 450), "25C03": (450, 679)}
 cells_25 = {
@@ -36,8 +38,8 @@ for name, eis_f, cap_f in [
     ("35C02", "EIS_data_35C02.txt",  "capacity35C02.txt"),
     ("45C02", "EIS_data_45C02.txt",  "capacity45C02.txt"),
 ]:
-    eis = np.loadtxt(os.path.join(DATA, eis_f))
-    cap = np.loadtxt(os.path.join(DATA, cap_f))
+    eis = np.loadtxt(DATA / eis_f)
+    cap = np.loadtxt(DATA / cap_f)
     cells_other[name] = {"eis": eis, "cap": cap, "cyc": np.arange(len(cap)) * 2}
 
 all_cells = {**cells_25, **cells_other}
@@ -74,7 +76,7 @@ ax_cap.grid(True, alpha=0.3)
 ax_cap.set_xlabel("Cycle number", fontsize=11)
 
 plt.tight_layout()
-out_path = os.path.join(OUT, "fig_ReZ_cambridge.png")
+out_path = OUT / "fig_ReZ_cambridge.png"
 plt.savefig(out_path, dpi=150)
+plt.close()
 print(f"Saved: {out_path}")
-plt.show()
