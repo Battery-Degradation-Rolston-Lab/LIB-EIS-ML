@@ -4,6 +4,8 @@ alongside capacity, to show the bulk resistance increase with degradation.
 """
 
 import numpy as np
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import os
 
@@ -44,5 +46,5 @@ ax_cap.set_xlabel("Cycle number", fontsize=11)
 plt.tight_layout()
 out = os.path.join(OUT_DIR, "fig_ReZ_vs_cycle.png")
 plt.savefig(out, dpi=150)
+plt.close()
 print(f"Saved: {out}")
-plt.show()

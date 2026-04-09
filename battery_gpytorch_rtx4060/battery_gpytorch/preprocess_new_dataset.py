@@ -103,8 +103,8 @@ def parse_peis_cell(zip_path: str, cell: str) -> tuple:
             skipped += 1
             continue  # skip incomplete sweeps
 
-        re_vals = np.array([freq_dict[f][0] for f in meas_freqs])
-        im_vals = np.array([freq_dict[f][1] for f in meas_freqs])
+        re_vals = np.array([freq_dict[f][0] for f in meas_freqs[:N_FREQS]])
+        im_vals = np.array([freq_dict[f][1] for f in meas_freqs[:N_FREQS]])
 
         # 66 features: Re(Z) then Im(Z), both high→low freq — no interpolation
         feat = np.concatenate([re_vals, im_vals])
@@ -116,7 +116,7 @@ def parse_peis_cell(zip_path: str, cell: str) -> tuple:
     cycle_numbers = np.array(common_cycles[:len(eis_matrix)])
 
     if skipped:
-        print(f'  [{cell}] Skipped {skipped} cycles with <5 EIS points')
+        print(f'  [{cell}] Skipped {skipped} cycles with <{N_FREQS} EIS points')
 
     return eis_matrix, capacities, cycle_numbers
 

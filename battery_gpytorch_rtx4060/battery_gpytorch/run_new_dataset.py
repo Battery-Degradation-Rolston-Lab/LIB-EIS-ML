@@ -79,10 +79,6 @@ X_tr_n = apply_norm(EIS_tr, mu_x, sig_x)
 _, mu_x_tr, sig_x_tr = zscore(EIS_tr.copy())
 X_rul_tr_n = apply_norm(EIS_rul_tr, mu_x_tr, sig_x_tr)
 
-# Normalise capacity output
-Y_tr, mu_y, sig_y = zscore(Cap_tr.copy())
-sig_y_scalar = sig_y[0] if sig_y.ndim > 0 else sig_y
-
 # ---------------------------------------------------------------------------
 # MODEL 1 — Capacity GPR  (Fixed RBF, same approach as paper reproduction)
 # ---------------------------------------------------------------------------
