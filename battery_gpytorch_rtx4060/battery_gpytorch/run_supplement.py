@@ -10,9 +10,11 @@ Not reproducible:
   Supp Fig 2  : Multi-state GPR (States VII/VIII not released on Zenodo)
   Supp Table 1: Requires capacity+voltage baseline model (not implemented)
 
+All inputs are loaded from data/ (committed to git).  raw_data/ is not required.
+
 Frequency grid (60 pts, descending):
-  Index 30 (0-based) = 17.796 Hz  → feature #91  (1-indexed)
-  Index 39 (0-based) =  2.161 Hz  → feature #100 (1-indexed)
+  Index 30 (0-based) = 17.796 Hz  -> feature #91  (1-indexed)
+  Index 39 (0-based) =  2.161 Hz  -> feature #100 (1-indexed)
 """
 
 import matplotlib
@@ -22,62 +24,40 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D  # noqa: F401 — registers 3D projection
 from pathlib import Path
 
-EIS_DIR = Path(__file__).parents[2] / "raw_data" / "zenodo_eis"
-CAP_DIR = Path(__file__).parents[2] / "raw_data" / "zenodo_capacity"
-OUT     = Path(__file__).parent / "output" / "supplement"
+DATA = Path(__file__).parent / "data"
+OUT  = Path(__file__).parent / "output" / "supplement"
 OUT.mkdir(parents=True, exist_ok=True)
 
 BLUE  = np.array([0,   114, 189]) / 255
 GREEN = np.array([77,  190,  82]) / 255
 RED   = np.array([217,  83,  25]) / 255
 
+# Known frequency grid (60 pts, descending) — confirmed from Zenodo raw files.
+# Index 30 = 17.796 Hz (feature #91), index 39 = 2.161 Hz (feature #100).
+FREQS = np.array([
+    20004.453, 15829.126, 12516.703,  9909.442,  7835.480,  6217.246,
+     4905.291,  3881.274,  3070.983,  2430.778,  1923.154,  1522.436,
+     1203.845,   952.866,   754.276,   596.719,   471.963,   373.209,
+      295.473,   233.877,   185.059,   146.358,   115.778,    91.672,
+       72.517,    57.368,    45.363,    35.931,    28.409,    22.482,
+       17.796,    14.068,    11.145,     8.818,     6.975,     5.517,
+        4.369,     3.457,     2.735,     2.161,     1.710,     1.354,
+        1.071,     0.847,     0.671,     0.531,     0.420,     0.332,
+        0.263,     0.208,     0.165,     0.130,     0.103,     0.082,
+        0.064,     0.051,     0.040,     0.032,     0.025,     0.020,
+])
+
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
-def load_eis_stateV(cell: str):
-    """
-    Load EIS_state_V_{cell}.txt.
-    Returns:
-      eis     : (N, 120) array  — cols 0-59 Re(Z), cols 60-119 -Im(Z), freqs descending
-      freqs   : (60,) array    — frequency grid in Hz, descending
-      cycles  : (N,) array     — battery cycle numbers (one entry per complete EIS)
-    Skips incomplete EIS sweeps (not exactly 60 frequency points).
-    """
-    path = EIS_DIR / f"EIS_state_V_{cell}.txt"
-    raw  = np.loadtxt(path, skiprows=1)
-    # cols: time(0) cycle(1) freq(2) Re(Z)(3) -Im(Z)(4) |Z|(5) Phase(6)
-    unique_cycles = np.unique(raw[:, 1])
-    rows, cyc_out = [], []
-    freq_grid = None
-    for c in unique_cycles:
-        mask = raw[:, 1] == c
-        pts  = raw[mask]
-        if len(pts) != 60:
-            continue
-        pts = pts[np.argsort(pts[:, 2])[::-1]]   # sort freq descending
-        if freq_grid is None:
-            freq_grid = pts[:, 2]
-        rows.append(np.concatenate([pts[:, 3], pts[:, 4]]))
-        cyc_out.append(c)
-    return np.array(rows), freq_grid, np.array(cyc_out)
+def load_eis(fname: str) -> np.ndarray:
+    """Load a preprocessed (N, 120) EIS matrix from data/."""
+    return np.loadtxt(DATA / fname)
 
 
-def load_capacity(cell: str):
-    """
-    Load Data_Capacity_{cell}.txt.
-    Returns (caps, cycles): discharge capacity per battery cycle (mAh).
-    """
-    path = CAP_DIR / f"Data_Capacity_{cell}.txt"
-    raw  = np.loadtxt(path, skiprows=1)
-    # cols: time(0) cycle(1) ox/red(2) ... Capacity/mAh(-1)
-    caps, cyc_out = {}, []
-    for c in np.unique(raw[:, 1]):
-        d   = raw[raw[:, 1] == c]
-        dis = d[d[:, 2] == 0]          # ox/red=0 → discharge
-        if len(dis):
-            caps[c] = dis[:, -1].max() # cumulative max = total discharge capacity
-    sorted_c = sorted(caps)
-    return np.array([caps[c] for c in sorted_c]), np.array(sorted_c)
+def load_cap(fname: str) -> np.ndarray:
+    """Load a preprocessed capacity vector from data/."""
+    return np.loadtxt(DATA / fname)
 
 
 # ── SUPP FIG 3 ── EIS spectra 3D + -Im[Z] trend for 25C01 ───────────────────
@@ -86,13 +66,15 @@ print("\n" + "=" * 60)
 print("SUPP FIG 3 — 25C01 EIS spectra 3D + ARD feature trends")
 print("=" * 60)
 
-eis, freqs, cycles = load_eis_stateV("25C01")
-print(f"  Loaded: {eis.shape[0]} cycles, {eis.shape[1]} features")
-print(f"  Freq range: {freqs[-1]:.4f} – {freqs[0]:.2f} Hz")
+eis    = load_eis("EIS_data_25C01.txt")    # (261, 120)
+freqs  = FREQS                              # 60-pt grid, descending
+cycles = np.arange(1, len(eis) + 1, dtype=float)   # cycle index 1, 2, ...
+print(f"  Loaded EIS_data_25C01.txt: {eis.shape[0]} cycles, {eis.shape[1]} features")
 
-# Identify ARD feature frequencies
-idx91  = np.argmin(np.abs(freqs - 17.80))   # should be index 30
-idx100 = np.argmin(np.abs(freqs -  2.16))   # should be index 39
+# Feature #91 (1-indexed) = index 90 -> -Im(Z) at freq index 30 = 17.796 Hz
+# Feature #100 (1-indexed) = index 99 -> -Im(Z) at freq index 39 = 2.161 Hz
+idx91  = np.argmin(np.abs(freqs - 17.80))   # 30
+idx100 = np.argmin(np.abs(freqs -  2.16))   # 39
 f91    = freqs[idx91]
 f100   = freqs[idx100]
 print(f"  Feature #91 : freq index {idx91}, actual = {f91:.3f} Hz (paper: 17.80 Hz)")
@@ -128,7 +110,7 @@ ax.view_init(elev=22, azim=-55)
 fig.patch.set_facecolor("white")
 plt.tight_layout()
 fig.savefig(OUT / "suppfig3a_EIS_spectra_3D_25C01.png", dpi=150)
-print(f"  Saved → suppfig3a_EIS_spectra_3D_25C01.png")
+print(f"  Saved -> suppfig3a_EIS_spectra_3D_25C01.png")
 plt.close(fig)
 
 # ── Supp Fig 3b — -Im[Z] vs cycle for the two salient frequencies ────────────
@@ -146,7 +128,7 @@ ax.set_xlim(left=0)
 fig.patch.set_facecolor("white")
 plt.tight_layout()
 fig.savefig(OUT / "suppfig3b_ImZ_trend_25C01.png", dpi=150)
-print(f"  Saved → suppfig3b_ImZ_trend_25C01.png")
+print(f"  Saved -> suppfig3b_ImZ_trend_25C01.png")
 plt.close(fig)
 
 
@@ -179,14 +161,28 @@ TEST_COLORS = [
 
 fig, ax = plt.subplots(figsize=(10, 6))
 
+# Capacity file mapping — all from data/ (committed to git)
+# 25C cells: Capacity_data_25C0{n}.txt (generated by preprocess_zenodo.py)
+# 35C/45C:   existing files already committed for run_gpytorch.py
+CAP_FILES = {
+    "25C01": "Capacity_data_25C01.txt", "25C02": "Capacity_data_25C02.txt",
+    "25C03": "Capacity_data_25C03.txt", "25C04": "Capacity_data_25C04.txt",
+    "35C01": "Capacity_data_35.txt",    "45C01": "Capacity_data_45.txt",
+    "25C05": "Capacity_data_25C05.txt", "25C06": "Capacity_data_25C06.txt",
+    "25C07": "Capacity_data_25C07.txt", "25C08": "Capacity_data_25C08.txt",
+    "35C02": "capacity35C02.txt",       "45C02": "capacity45C02.txt",
+}
+
 for cell, col in zip(TRAIN, TRAIN_COLORS):
-    caps, cyc = load_capacity(cell)
+    caps = load_cap(CAP_FILES[cell])
+    cyc  = np.arange(len(caps))
     ax.plot(cyc, caps, color=col, lw=1.2, label=f"{cell}-train")
     print(f"  {cell} (train): {len(caps)} cycles, "
           f"init={caps[0]:.1f}, final={caps[-1]:.1f} mAh")
 
 for cell, col in zip(TEST, TEST_COLORS):
-    caps, cyc = load_capacity(cell)
+    caps = load_cap(CAP_FILES[cell])
+    cyc  = np.arange(len(caps))
     ax.plot(cyc, caps, color=col, lw=1.2, label=f"{cell}-test")
     print(f"  {cell} (test): {len(caps)} cycles, "
           f"init={caps[0]:.1f}, final={caps[-1]:.1f} mAh")
@@ -199,7 +195,7 @@ ax.set_xlim(left=0)
 fig.patch.set_facecolor("white")
 plt.tight_layout()
 fig.savefig(OUT / "suppfig4_capacity_retention_all_cells.png", dpi=150)
-print(f"  Saved → suppfig4_capacity_retention_all_cells.png")
+print(f"  Saved -> suppfig4_capacity_retention_all_cells.png")
 plt.close(fig)
 
 
