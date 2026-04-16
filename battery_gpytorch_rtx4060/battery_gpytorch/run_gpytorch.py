@@ -52,26 +52,27 @@ def zscore(X):
     return (X - mu) / sig, mu, sig
 
 
-def make_rbf_kernel(l_init=10.0):
+def make_rbf_kernel(l_init=1.0):
     """Isotropic RBF + WhiteKernel.
-    l_init=10 (not 1): in 120-D z-scored space typical ||x-x'||^2 ≈ 120,
-    so l=1 gives K_rbf ≈ exp(-60) ≈ 0 AND dK/dl ≈ 0 — flat landscape,
-    L-BFGS-B never moves.  l=10 gives K ≈ exp(-0.6) ≈ 0.55, non-zero
-    gradient, optimizer finds correct optimum.
-    WhiteKernel acts as noise escape valve for degenerate RBF configurations.
+    noise_level=0.01 matches MATLAB initial sn=0.1 (variance=0.01).
+    With normalize_y=True the targets have std=1; starting noise at 1.0
+    lets the optimizer absorb all variance into noise (trivial local min).
+    Starting at 0.01 forces the RBF to be used — same effect as MATLAB.
+    Upper bound 0.1 prevents noise from dominating during optimization.
     """
     return (C(1.0, (1e-3, 1e3))
             * RBF(length_scale=l_init, length_scale_bounds=(1e-2, 1e4))
-            + WhiteKernel(noise_level=1.0, noise_level_bounds=(1e-10, 1e5)))
+            + WhiteKernel(noise_level=0.01, noise_level_bounds=(1e-6, 0.1)))
 
 
 def make_linear_kernel():
     """Linear kernel k(x,z)=c*x'z + noise.
-    WhiteKernel added so optimizer doesn't get stuck in singular configurations.
+    noise_level=0.01 matches MATLAB initial sn=0.1 (variance=0.01) —
+    same reasoning as make_rbf_kernel: prevents noise-absorption local min.
     """
     return (C(1.0, (1e-3, 1e3))
             * DotProduct(sigma_0=0.0, sigma_0_bounds="fixed")
-            + WhiteKernel(noise_level=1.0, noise_level_bounds=(1e-10, 1e5)))
+            + WhiteKernel(noise_level=0.01, noise_level_bounds=(1e-6, 0.1)))
 
 
 def make_ard_kernel(n_feat=120, l_init=1.0):
