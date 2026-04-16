@@ -59,3 +59,37 @@ false EOL detections as early as cycle 6. Fix: `find_eol` in `preprocess_zenodo.
 Impact: 25C02 and 25C03 are now correctly DNF (no EOL); 25C05/06/07 EOL indices shifted
 +50–100 cycles later. Only applies to Cambridge/Zenodo cells. CA/CB/A cells use cap[0]
 (no confirmed pre-cycling in their MPT protocol).
+
+---
+
+## 2026-04-16 (session 2)
+
+**sklearn GPR with L-BFGS-B always converges to dead-kernel local min (l~3)**:
+For the isotropic RBF on the 1358-sample 120-D z-scored dataset, L-BFGS-B with any
+number of restarts or any starting point converges to l≈3 (dead kernel, R²≈0.30).
+The fix is a FIXED length-scale found by grid-search: l=1500 for multi-T (1358-sample),
+l=1000 for single-T 25°C (760-sample). MATLAB's `minimize` with 10000 steps stops at
+an intermediate l≈1500 that generalises well but is not the MLL optimum. Do NOT use
+`make_rbf_kernel()` with L-BFGS-B optimization for these models.
+
+**Linear RUL model: normalize_y=False + fixed DotProduct + alpha=0.1**:
+With normalize_y=True and the DotProduct kernel, the centred y + tiny alpha makes the
+kernel matrix ill-conditioned and the model collapses to the mean. Use normalize_y=False
+with alpha=0.1 (multi-T) or alpha=0.4 (single-T 25°C). No WhiteKernel wrapper needed.
+
+**EOL fix (cap[30]) breaks paper reproduction for RUL test files**:
+run_gpytorch.py reproduces the paper which used cap[0] for Cambridge cell EOL.
+After the cap[30] fix, rul45C02.txt grew from 195→267 rows and 25C05 RUL files
+grew from 77→184 rows. This caused RUL scale mismatch with GitHub training data
+(trained on cap[0] RUL labels). For paper reproduction, restore the pre-fix RUL
+files (7776feb commit). The cap[30] correction is correct for standalone analysis
+but must not be used as run_gpytorch.py test data.
+
+**Fig 1a 25°C capacity: use GitHub EIS_data.txt[:760] for training**:
+Zenodo 25C04 has only 35 EIS cycles (vs 190 in GitHub) due to data truncation.
+Using Zenodo EIS_data_25C_train.txt (679 rows) gives R²≈-0.06; switching to
+GitHub EIS_data.txt[:760] (4×190 = 760 rows) gives R²≈0.88 for 25C05.
+
+**25C08 RUL is a known anomaly**: 25C08 has anomalous EIS that barely changes
+over its short cycle life (different degradation mechanism from training cells).
+Negative R² for 25C08 is expected and documented in the original code.

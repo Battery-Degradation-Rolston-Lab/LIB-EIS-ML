@@ -284,7 +284,12 @@ gpr_fig1 = fit_rbf_fixed(X_25tr_j, y_25tr, l=1000.0)
 
 Y_pred_fig1, Y_std_fig1 = gpr_fig1.predict(X_25te_j, return_std=True)
 r2_fig1 = r2_score(Cap_25te, Y_pred_fig1)
-print(f"  R2 = {r2_fig1:.4f}   (paper target: 0.88)")
+# Cell slices in EIS_data_25C_test.txt: 25C05(275) 25C06(212) 25C07(140) 25C08(37)
+_slices = [(0, 275), (275, 487), (487, 627), (627, 664)]
+r2_fig1_25c05 = r2_score(Cap_25te[_slices[0][0]:_slices[0][1]],
+                          Y_pred_fig1[_slices[0][0]:_slices[0][1]])
+print(f"  R2 (25C05 only) = {r2_fig1_25c05:.4f}   (paper target: 0.88)")
+print(f"  R2 (all cells)  = {r2_fig1:.4f}")
 
 # ARD weights — separate ARD fit on same training data
 print("  Fitting sklearn ARD-GPR for Fig 1c weights (L-BFGS-B, 3 restarts) ...")
@@ -382,7 +387,8 @@ for i, cell in enumerate(fig2_test_cells):
     ax.set_ylabel("Predicted RUL", fontsize=11)
     ax.set_title(f"{cell}  R2={r2:.2f}", fontsize=11)
 
-fig.suptitle("Single-T 25degC RUL GPR (Fig 2)", fontsize=13)
+fig.suptitle("Single-T 25degC RUL GPR (Fig 2)  [25C08 anomalous EIS — negative R² expected]",
+             fontsize=11)
 fig.patch.set_facecolor("white")
 plt.tight_layout()
 fig.savefig(OUT / "fig2_rul_25C.png", dpi=150)
@@ -466,7 +472,7 @@ print("=" * 60)
 print(f"  [Fig 3a] Multi-T  35C cap  R2 = {r2_cap:.4f}   (paper: 0.81)")
 print(f"  [Fig 4b] Multi-T  35C RUL  R2 = {r2_rul:.4f}   (paper: 0.75)")
 print(f"  [Fig 3c] ARD 35C  top feat : #{top_feat}        (paper: #91)")
-print(f"  [Fig 1a] Single-T 25C cap  R2 = {r2_fig1:.4f}   (paper: 0.88)")
+print(f"  [Fig 1a] Single-T 25C cap  R2(25C05)={r2_fig1_25c05:.4f}  R2(all)={r2_fig1:.4f}   (paper: 0.88 for 25C05)")
 print(f"  [Fig 1c] ARD 25C  top feat : #{top_fig1}  top-5={top5_fig1}")
 print(f"  [Fig 2 ] Single-T 25C RUL  R2/cell: " +
       " | ".join(f"{c}={r2_fig2_cells[c]:.2f}" for c in fig2_test_cells))

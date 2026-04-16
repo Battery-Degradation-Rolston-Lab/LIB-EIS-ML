@@ -126,8 +126,12 @@ LIB-EIS-ML/
 
 | Model | Result | Notes |
 |-------|--------|-------|
-| Paper Fig 3a capacity (35°C) | R²=0.91 (target 0.81) | Beat target |
-| Paper Fig 4b RUL (35°C) | R²=0.85 (target 0.75) | Beat target |
+| Paper Fig 3a capacity (35°C) | R²=0.91 (target 0.81) | Beat target — fixed RBF l=1500 |
+| Paper Fig 4b RUL (35°C) | R²=0.85 (target 0.75) | Beat target — linear alpha=0.1 |
+| Paper Fig 3b capacity (45°C) | R²=0.945 (target 0.72) | Beat target |
+| Paper Fig 4c RUL (45°C) | R²=0.906 (target 0.92) | Close — within 1.5% |
+| Paper Fig 1a capacity (25°C) | R²=0.88 (25C05), 0.80 (all) | Matches target for 25C05 |
+| Paper Fig 2 RUL (25°C) | 25C05=0.84/25C06=0.95/25C07=0.76/25C08=−0.33 | 25C08 anomalous EIS — expected |
 | A1-A8 Capacity LOOCV | mean R²=0.964 | Strong generalisation across all 8 cells |
 | A1-A8 RUL Linear LOOCV | mean R²=−0.33 | Absolute RUL doesn't transfer — expected |
 | CA1-CA8 Capacity LOOCV | mean R²=0.934 | Joint norm, fixed RBF l=30 — `run_loocv.py` |
