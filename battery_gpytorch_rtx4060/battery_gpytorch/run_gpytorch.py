@@ -260,15 +260,16 @@ print(f"  Saved -> {OUT / 'fig3c_ARD_weights.png'}")
 # Prediction: fixed RBF l=1000 (sweet-spot for 25°C single-T dataset)
 # Feature importance: ARD-GPR (same training data)
 # Normalisation: JOINT (train+test combined) removes cell-to-cell offset
-# Train: Zenodo 25C01-04  Test: Zenodo 25C05-08
+# Train: GitHub EIS_data.txt[:760] (4×190 rows, 25C01-04)
+# Test:  Zenodo EIS_data_25C_test.txt (25C05-08)
 # Target R2 = 0.88  (paper reports 25C05 only)
 # ============================================================================
 print("\n" + "=" * 60)
 print("MODEL 4 -- Single-T 25degC EIS-Capacity GPR  (Fig 1a+1c)")
 print("=" * 60)
 
-EIS_25tr = load("EIS_data_25C_train.txt")
-Cap_25tr = load("Capacity_data_25C_train.txt")
+EIS_25tr = load("EIS_data.txt")[:760]        # GitHub 25C01-04 block (4×190)
+Cap_25tr = load("Capacity_data.txt")[:760]
 EIS_25te = load("EIS_data_25C_test.txt")
 Cap_25te = load("Capacity_data_25C_test.txt")
 
