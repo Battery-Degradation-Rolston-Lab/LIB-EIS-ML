@@ -45,3 +45,17 @@ importance scores on this representation are misleading — predictive power att
 Re(ω) at one frequency may actually belong to the coupled (Re, Im) structure at another
 frequency via K-K. The correct representation pairs (Re, Im) per frequency point and assigns
 one ARD length-scale per ω.
+
+---
+
+## 2026-04-16
+
+**EOL reference for Cambridge cells is cap[30], not cap[0]**: The paper states "80% of its
+initial value after undergoing 30 pre-cycles at 25°C". The Zenodo capacity data INCLUDES
+these 30 pre-cycles (formation cycling), causing a steep initial capacity drop (~5–20% in
+first 30 cycles). Using cap[0] as reference gives artificially high EOL thresholds, triggering
+false EOL detections as early as cycle 6. Fix: `find_eol` in `preprocess_zenodo.py` now uses
+`caps[min(30, len(caps)-1)]` as the reference.
+Impact: 25C02 and 25C03 are now correctly DNF (no EOL); 25C05/06/07 EOL indices shifted
++50–100 cycles later. Only applies to Cambridge/Zenodo cells. CA/CB/A cells use cap[0]
+(no confirmed pre-cycling in their MPT protocol).

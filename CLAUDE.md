@@ -112,7 +112,10 @@ LIB-EIS-ML/
 - EIS normalisation: always zscore — training stats applied to test set
 - Capacity LOOCV: **joint norm** (train+test pooled) removes cell-to-cell impedance offset
 - RUL normalisation: **training-only** (paper's stated approach)
-- EOL = first index where capacity < 80% of cap[0]
+- EOL (Cambridge/Zenodo cells) = first index where capacity < 80% of cap[30]
+  (paper: "80% of initial value after 30 pre-cycles at 25°C")
+- EOL (CA/CB/A cells) = first index where capacity < 80% of cap[0]
+  (no confirmed pre-cycling phase in MPT protocol)
 - `DNF_CELLS = {'A3', 'A6'}` — experimenter-confirmed non-failures; A3 has anomalously
   low initial cap (3800 mAh vs ~4050 mAh fleet), causing false EOL detection
 - ARD weight formula: `w = exp(−σ_m)`, normalise to sum=1 (NOT `exp(-10^log(σ))`)

@@ -106,7 +106,11 @@ ax.set_ylabel("Cycle number",  fontsize=10, labelpad=8)
 ax.set_zlabel("-Im[Z] (Ohm)", fontsize=10, labelpad=8)
 ax.set_title("25C01 — EIS spectra at State V  (Supp Fig 3a)", fontsize=12)
 ax.legend(fontsize=10, loc="upper left")
-ax.view_init(elev=22, azim=-55)
+# Match paper: Re[Z] runs right-to-left (high→low), cycle 0→300 front-to-back
+ax.set_xlim(re_all.max() * 1.05, 0)
+ax.set_ylim(0, max(cycles[-1], 300))
+ax.set_zlim(-0.1, 0.5)
+ax.view_init(elev=20, azim=-135)
 fig.patch.set_facecolor("white")
 plt.tight_layout()
 fig.savefig(OUT / "suppfig3a_EIS_spectra_3D_25C01.png", dpi=150)
@@ -124,7 +128,8 @@ ax.set_ylabel("-Im[Z] (Ohm)", fontsize=13)
 ax.set_title("25C01 — -Im[Z] at salient frequencies vs cycle  (Supp Fig 3b)",
              fontsize=11)
 ax.legend(frameon=False, fontsize=11)
-ax.set_xlim(left=0)
+ax.set_xlim(0, max(cycles[-1], 300))
+ax.set_ylim(0.04, 0.30)
 fig.patch.set_facecolor("white")
 plt.tight_layout()
 fig.savefig(OUT / "suppfig3b_ImZ_trend_25C01.png", dpi=150)
@@ -167,10 +172,12 @@ fig, ax = plt.subplots(figsize=(10, 6))
 CAP_FILES = {
     "25C01": "Capacity_data_25C01.txt", "25C02": "Capacity_data_25C02.txt",
     "25C03": "Capacity_data_25C03.txt", "25C04": "Capacity_data_25C04.txt",
-    "35C01": "Capacity_data_35.txt",    "45C01": "Capacity_data_45.txt",
+    # Note: Zenodo preprocessed 35C data contains 35C02 for both train/test cells;
+    # 35C01 raw individual file is available but was not part of the original release.
+    "35C01": "Capacity_data_35.txt",    "45C01": "Capacity_data_45C01.txt",
     "25C05": "Capacity_data_25C05.txt", "25C06": "Capacity_data_25C06.txt",
     "25C07": "Capacity_data_25C07.txt", "25C08": "Capacity_data_25C08.txt",
-    "35C02": "capacity35C02.txt",       "45C02": "capacity45C02.txt",
+    "35C02": "Capacity_data_35C02.txt", "45C02": "Capacity_data_45C02.txt",
 }
 
 for cell, col in zip(TRAIN, TRAIN_COLORS):
@@ -191,7 +198,8 @@ ax.set_xlabel("Cycle number",  fontsize=13)
 ax.set_ylabel("Capacity (mAh)", fontsize=13)
 ax.set_title("Capacity retention curves — all 12 cells  (Supp Fig 4)", fontsize=12)
 ax.legend(fontsize=8, ncol=2, frameon=False, loc="lower left")
-ax.set_xlim(left=0)
+ax.set_xlim(0, 500)
+ax.set_ylim(15, 45)
 fig.patch.set_facecolor("white")
 plt.tight_layout()
 fig.savefig(OUT / "suppfig4_capacity_retention_all_cells.png", dpi=150)

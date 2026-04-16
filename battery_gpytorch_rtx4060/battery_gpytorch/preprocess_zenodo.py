@@ -11,7 +11,8 @@ Alignment convention (confirmed by comparison with GitHub files):
 
 RUL convention (confirmed from rul35C02.txt):
   - EIS measured every 2 battery cycles
-  - EOL = first capacity index where capacity < 80% of initial (index 0)
+  - EOL = first capacity index where capacity < 80% of cap[30]
+          (paper: "80% of initial value after 30 pre-cycles at 25°C")
   - RUL[i] = 2 * (EOL_index - i)  for i = 0 .. EOL_index
 """
 
@@ -71,10 +72,15 @@ def preprocess_capacity(cell: str) -> np.ndarray:
     return np.array([caps[c] for c in sorted_cycles])
 
 
-def find_eol(caps: np.ndarray, threshold: float = 0.80) -> int:
-    """Return first index where capacity drops below threshold * initial."""
-    init = caps[0]
-    thr = init * threshold
+def find_eol(caps: np.ndarray, threshold: float = 0.80,
+             precycle: int = 30) -> int:
+    """Return first index where capacity drops below threshold * reference.
+
+    Reference = caps[precycle] per paper: "80% of its initial value after
+    undergoing 30 pre-cycles at 25°C" (Zhang et al., Nat. Commun. 2020).
+    """
+    ref = caps[min(precycle, len(caps) - 1)]
+    thr = ref * threshold
     for i, c in enumerate(caps):
         if c < thr:
             return i
