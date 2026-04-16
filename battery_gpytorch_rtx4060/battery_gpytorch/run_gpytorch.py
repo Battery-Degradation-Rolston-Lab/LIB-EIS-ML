@@ -52,13 +52,13 @@ def zscore(X):
     return (X - mu) / sig, mu, sig
 
 
-def make_rbf_kernel(l_init=1.0):
+def make_rbf_kernel(l_init=10.0):
     """Isotropic RBF + WhiteKernel.
-    WhiteKernel is critical: without it, large l_init (~50) makes K nearly
-    rank-1 (all entries ~0.95 for 120-D z-scored data), causing L-BFGS
-    ABNORMAL_TERMINATION after only 4 iterations.  WhiteKernel provides an
-    'escape valve' so the optimizer can fit data as noise when the RBF is
-    degenerate, then reduce noise as it finds the correct l.
+    l_init=10 (not 1): in 120-D z-scored space typical ||x-x'||^2 ≈ 120,
+    so l=1 gives K_rbf ≈ exp(-60) ≈ 0 AND dK/dl ≈ 0 — flat landscape,
+    L-BFGS-B never moves.  l=10 gives K ≈ exp(-0.6) ≈ 0.55, non-zero
+    gradient, optimizer finds correct optimum.
+    WhiteKernel acts as noise escape valve for degenerate RBF configurations.
     """
     return (C(1.0, (1e-3, 1e3))
             * RBF(length_scale=l_init, length_scale_bounds=(1e-2, 1e4))
