@@ -118,17 +118,28 @@ print(f"  Saved -> suppfig3a_EIS_spectra_3D_25C01.png")
 plt.close(fig)
 
 # ── Supp Fig 3b — -Im[Z] vs cycle for the two salient frequencies ────────────
+# Skip first 30 cycles (RT pre-formation). Trim to EOL so both features appear
+# linear — the 2.16 Hz feature jumps exponentially only in post-EOL cycles.
+PRE = 30
+cap_25c01 = load_cap("Capacity_data_25C01.txt")
+ref_25c01 = cap_25c01[min(30, len(cap_25c01) - 1)]
+eol_25c01 = next((i for i, c in enumerate(cap_25c01) if c < 0.8 * ref_25c01),
+                 len(cap_25c01) - 1)
+print(f"  25C01 EOL index: {eol_25c01}  (cap={cap_25c01[eol_25c01]:.2f} mAh)")
+
+cyc3b = cycles[PRE:eol_25c01 + 1]
+im3b  = im_all[PRE:eol_25c01 + 1]
 fig, ax = plt.subplots(figsize=(8, 4))
-ax.plot(cycles, im_all[:, idx91],  color=BLUE,  lw=1.5,
+ax.plot(cyc3b, im3b[:, idx91],  color=BLUE,  lw=1.5,
         label=f"91st  ({f91:.2f} Hz)")
-ax.plot(cycles, im_all[:, idx100], color=GREEN, lw=1.5,
+ax.plot(cyc3b, im3b[:, idx100], color=GREEN, lw=1.5,
         label=f"100th ({f100:.2f} Hz)")
 ax.set_xlabel("Cycle Number",  fontsize=13)
 ax.set_ylabel("-Im[Z] (Ohm)", fontsize=13)
 ax.set_title("25C01 — -Im[Z] at salient frequencies vs cycle  (Supp Fig 3b)",
              fontsize=11)
 ax.legend(frameon=False, fontsize=11)
-ax.set_xlim(0, max(cycles[-1], 300))
+ax.set_xlim(PRE, max(cyc3b[-1] + 10, 200))
 ax.set_ylim(0.04, 0.30)
 fig.patch.set_facecolor("white")
 plt.tight_layout()
@@ -180,26 +191,32 @@ CAP_FILES = {
     "35C02": "Capacity_data_35C02.txt", "45C02": "Capacity_data_45C02.txt",
 }
 
+PRE4 = 30  # skip RT pre-formation cycles; normalize to cap[30] per paper
+
 for cell, col in zip(TRAIN, TRAIN_COLORS):
     caps = load_cap(CAP_FILES[cell])
-    cyc  = np.arange(len(caps))
-    ax.plot(cyc, caps, color=col, lw=1.2, label=f"{cell}-train")
+    ref  = caps[min(PRE4, len(caps) - 1)]
+    ret  = caps[PRE4:] / ref
+    cyc  = np.arange(PRE4, PRE4 + len(ret))
+    ax.plot(cyc, ret, color=col, lw=1.2, label=f"{cell}-train")
     print(f"  {cell} (train): {len(caps)} cycles, "
-          f"init={caps[0]:.1f}, final={caps[-1]:.1f} mAh")
+          f"ref={ref:.1f} mAh, final retention={ret[-1]:.3f}")
 
 for cell, col in zip(TEST, TEST_COLORS):
     caps = load_cap(CAP_FILES[cell])
-    cyc  = np.arange(len(caps))
-    ax.plot(cyc, caps, color=col, lw=1.2, label=f"{cell}-test")
+    ref  = caps[min(PRE4, len(caps) - 1)]
+    ret  = caps[PRE4:] / ref
+    cyc  = np.arange(PRE4, PRE4 + len(ret))
+    ax.plot(cyc, ret, color=col, lw=1.2, label=f"{cell}-test")
     print(f"  {cell} (test): {len(caps)} cycles, "
-          f"init={caps[0]:.1f}, final={caps[-1]:.1f} mAh")
+          f"ref={ref:.1f} mAh, final retention={ret[-1]:.3f}")
 
 ax.set_xlabel("Cycle number",  fontsize=13)
-ax.set_ylabel("Capacity (mAh)", fontsize=13)
+ax.set_ylabel("Capacity Retention", fontsize=13)
 ax.set_title("Capacity retention curves — all 12 cells  (Supp Fig 4)", fontsize=12)
 ax.legend(fontsize=8, ncol=2, frameon=False, loc="lower left")
 ax.set_xlim(0, 500)
-ax.set_ylim(15, 45)
+ax.set_ylim(0.5, 1.05)
 fig.patch.set_facecolor("white")
 plt.tight_layout()
 fig.savefig(OUT / "suppfig4_capacity_retention_all_cells.png", dpi=150)
